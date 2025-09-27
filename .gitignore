@@ -1,0 +1,37 @@
+# SystemVerilog/Verilog and simulation tools
+
+# Ignore simulation output files
+*.vcd
+*.log
+*.wlf
+*.asdb
+*.svf
+*.jou
+*.pb
+*.tcl
+*.bak
+*.tmp
+*.out
+
+# Ignore ModelSim, Vivado, Quartus project files
+work/
+vsim.wlf
+transcript
+*.mif
+*.xpr
+*.Xil
+*.cache/
+*.hw/
+*.runs/
+*.sim/
+*.ip_user_files/
+*.Xil/
+*.vivado/
+*.webtalk/
+*.jou
+*.str
+*.db
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
