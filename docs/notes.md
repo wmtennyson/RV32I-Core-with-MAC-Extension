@@ -11,8 +11,8 @@ What to Buy:
 FPGA Board 
 
 Components: 
-- ALU
-- DSP Unit 
+- ALU (Arithmetic Logic Unit)
+- MAC (Multiply-Accumulate Unit for Convolution)
 - Register File
 - Program Counter
 - Instruction Memory
