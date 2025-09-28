@@ -1,6 +1,7 @@
 Project Idea: Build a 32-Bit CPU
 
 Reason: Oriented for Digital Signal Processing
+         Building a CPU that accelerates dot-product / Convolutional style workloads, which dominate DSP, image processing, and ML inference.
 
 Instruction Set Architecture (ISA): RISC-V 
 
