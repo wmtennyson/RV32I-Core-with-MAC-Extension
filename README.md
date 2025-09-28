@@ -1,9 +1,7 @@
-# Senior-Project---2025
-Design of a 32-Bit CPU tailored towards a DSP application.
 
 # Senior Project - 2025
 
-This repository contains the design and development of a CPU using SystemVerilog/Verilog for the 2025 Senior Project. The goal is to collaboratively design, implement, and test a custom CPU architecture as a team.
+Design of a 32-bit CPU tailored towards a DSP application. This repository contains the design and development of a CPU using SystemVerilog/Verilog for the 2025 Senior Project. The goal is to collaboratively design, implement, and test a custom CPU architecture as a team.
 
 ## Getting Started
 
