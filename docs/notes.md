@@ -22,17 +22,17 @@
            https://www.reddit.com/r/programming/comments/4mu8iw/homemade_32bit_cpu_and_os/
 
 **Articles to Read:**
-- 32-Bit DSP Processor:
+- ~~32-Bit DSP Processor:~~ (Alex)
            https://ieeexplore.ieee.org/abstract/document/8697775
 - FPGA based implementation of DSP, Basics of DSP :
           https://books.google.com/books?hl=en&lr=&id=O2-RPrJUHJAC&oi=fnd&pg=PR7&dq=FPGA+Digital+Signal+Processor&ots=-tr2fRrW_N&sig=mF-wp-hg-gbaIGrQBf-W9Vix5Nk#v=onepage&q=FPGA%20Digital%20Signal%20Processor&f=false
 - Guide to FPGA coding for DSP:
           https://www.spiedigitallibrary.org/conference-proceedings-of-spie/2914/0000/Guide-to-using-field-programmable-gate-arrays-FPGAs-for-application/10.1117/12.255830.short
 
-_**Fixed-Point Arithemtic**_  
-- ~~Fixed-Point Arithmetic: An Introduction — Randy Yates, Digital Signal Labs White Paper, 2013.~~
+_**Fixed-Point Arithemtic **_  
+- ~~Fixed-Point Arithmetic: An Introduction — Randy Yates, Digital Signal Labs White Paper, 2013.~~ (Will)
            http://www.digitalsignallabs.com/fp.pdf
-- Synthesizing Optimal Fixed-Point Arithmetic for Embedded Signal Processing — K. Joseph Hass, IEEE MWSCAS, 2010.
+- Synthesizing Optimal Fixed-Point Arithmetic for Embedded Signal Processing — K. Joseph Hass, IEEE MWSCAS, 2010. 
            https://ieeexplore.ieee.org/document/5548561
   
 _**RISC-V Custom DSP Extensions**_ 
@@ -50,7 +50,7 @@ _**Soft-Core CPU Design for DSP Applications**_
            https://pureadmin.qub.ac.uk/ws/portalfiles/portal/12692968/PID3359731.pdf
   
 _**Implementation of CPUs and DSP Accelerators on FPGA**_ 
-- Design and Implementation of a RISC-V SoC with Custom DSP Accelerators for Edge Computing — Priyanshu Yadav, arXiv preprint, 2025.
+- ~~Design and Implementation of a RISC-V SoC with Custom DSP Accelerators for Edge Computing — Priyanshu Yadav, arXiv preprint, 2025.~~ (Gio)
            https://arxiv.org/pdf/2506.06693
 - NEURAghe: Exploiting CPU-FPGA Synergies for Efficient CNN Inference on Zynq SoCs — Paolo Meloni et al., ACM TRETS, 2018.
            https://dl.acm.org/doi/10.1145/3284357
