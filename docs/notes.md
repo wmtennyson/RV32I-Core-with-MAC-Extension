@@ -30,7 +30,7 @@
           https://www.spiedigitallibrary.org/conference-proceedings-of-spie/2914/0000/Guide-to-using-field-programmable-gate-arrays-FPGAs-for-application/10.1117/12.255830.short
 
 _**Fixed-Point Arithemtic**_  
-- Fixed-Point Arithmetic: An Introduction — Randy Yates, Digital Signal Labs White Paper, 2013.
+- ~~Fixed-Point Arithmetic: An Introduction — Randy Yates, Digital Signal Labs White Paper, 2013.~~
            http://www.digitalsignallabs.com/fp.pdf
 - Synthesizing Optimal Fixed-Point Arithmetic for Embedded Signal Processing — K. Joseph Hass, IEEE MWSCAS, 2010.
            https://ieeexplore.ieee.org/document/5548561
@@ -38,7 +38,7 @@ _**Fixed-Point Arithemtic**_
 _**RISC-V Custom DSP Extensions**_ 
 - A Near-Threshold RISC-V Core with DSP Extensions for Scalable IoT Endpoint Devices — Michael Gautschi et al., IEEE Transactions on VLSI Systems, 2017.
            https://ieeexplore.ieee.org/document/7864441         
-- Designing RISC-V Instruction Set Extensions for Artificial Neural Networks: An LLVM Compiler-Driven Perspective — K.K. Balasubramanian et al., IEEE Access, 2024.
+- ~~Designing RISC-V Instruction Set Extensions for Artificial Neural Networks: An LLVM Compiler-Driven Perspective — K.K. Balasubramanian et al., IEEE Access, 2024.~~
            https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=10501937
 - EXTREM-EDGE: Extensions to RISC-V for Energy-Efficient ML Inference at the Edge — Vaibhav Verma, Trevor M. Tracy, Mircea R. Stan, IGSC Conference, 2021.
            https://www.sciencedirect.com/science/article/pii/S2210537922000749
