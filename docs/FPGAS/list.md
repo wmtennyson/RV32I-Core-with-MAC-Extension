@@ -1,5 +1,5 @@
 FPGA Board Pros and Cons
-Digilent Arty A7-100T
+*Digilent Arty A7-100T*
 
 The Arty A7 is a powerful, traditional FPGA board, perfect for designs that are heavy on digital logic (RTL).
 
@@ -19,6 +19,8 @@ The Arty A7 is a powerful, traditional FPGA board, perfect for designs that are 
 
         ❌ Less Suited for Hybrid Tasks: Not ideal for projects that need to run a full operating system like Linux for control, file management, or networking.
 
+
+------------
 TUL PYNQ-Z2
 
 This is an SoC (System-on-Chip) board that excels at making hardware acceleration accessible through software.
