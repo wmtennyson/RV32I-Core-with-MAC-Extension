@@ -23,38 +23,38 @@
 - Key takeaway: FPGAs balance customization + flexibility, enabling fine-grained parallelism and reduced latency for real-time tasks; sparsity can further boost throughput.
 - Compared with ASICs (fixed, efficient) and GPUs (throughput-oriented), FPGAs are reprogrammable and power-efficient for edge inference.
 #### Evaluation Framework
-##### Model Metrics
+##### _Model Metrics_
 - Accuracy, Precision, Recall; F1 balances precision–recall trade-offs.
-##### Hardware Metrics
+##### _Hardware Metrics_
 - Latency: sum of off-chip transfer, on-chip transfer, and compute; reduce via bandwidth, better storage/reuse, and more parallelism.
 - Throughput = Workloads / Latency; distinguish from peak.
 - Peak throughput (theoretical) = 2 × #MACs × f; use as the upper bound.
 - Compute (MAC) efficiency = Throughput / (2 × #MACs × f); device-independent indicator of how well the design uses its MACs.
 #### CNN Acceleration Methods
-##### Pruning & Quantization
+##### _Pruning & Quantization_
 - Pruning removes unimportant weights/channels; quantization lowers bit-width to pack more work per DSP and cut power. (Section header + survey scope)
-##### Model-Structure Compression
+##### _Model-Structure Compression_
 - Lightweight nets, knowledge distillation, and layer fusion (e.g., fold BatchNorm) lower compute and memory traffic. (Section outline)
-##### Computation Reduction
+##### _Computation Reduction_
 - FFT and Winograd reduce multiplications (large vs small kernels respectively); both are classic ways to shrink conv cost.
 #### Hardware Approaches
-##### Data Blocking & Parallel Computing
+##### _Data Blocking & Parallel Computing_
 - Loop tiling improves locality and reduces memory bandwidth; combine with pipelining/parallelism in FPGA fabrics.
 - Loop unrolling merges iterations to raise parallelism; degree must match resources/bandwidth to avoid congestion.
-##### Four Dimensions of Parallelism
+##### _Four Dimensions of Parallelism_
 - Filter (Pf), Channel (Pc), Pixel/Spatial (Pv), Kernel (Pk); designers mix these to fit layers and memory patterns.
 - Pv and Pk have buffering/size constraints; Pc/Pf are often more flexible for large throughput.
-##### Parallel Strategies in Practice
+##### _Parallel Strategies in Practice_
 - Examples show different mixes (e.g., Pk+Pv+Pf or Pv+Pf) with reported GOP/s and per-DSP efficiency; mismatch to layer shapes can underutilize resources.
 - Dynamic parallelism adapts Pf/Pc/Pv/Pk per layer to keep PEs busy; reported 72–98% compute efficiency on Stratix 10.
-##### Other Optimizations
+##### _Other Optimizations_
 - Input reshaping (e.g., im2col to GEMM) and DSP optimization (packing low-precision MACs) frequently used. (Section outline)
 #### Algorithm-Hardware Co-Design
-##### Toolflows
+##### _Toolflows_
 - Frameworks (e.g., fpgaConvNet, Angel-Eye, Snowflake, f-CNNx) automate mapping CNNs to FPGAs, using buffering, double-buffer overlaps, and multi-objective cost functions to hit latency/throughput targets.
-##### Design Space Exploration (DSE)
+##### _Design Space Exploration (DSE)_
 - Brute force, simulated annealing, genetic and other methods search tiling/unrolling/parallelism under resource and bandwidth limits. (Section outline)
-##### Performance & Resource Modeling
+##### _Performance & Resource Modeling_
 - Analytic and learned models predict latency/power/resources to speed up DSE; the paper visualizes power vs throughput vs latency trade-offs.
 #### Discussion & Conclusion
 - Architectural levers (deep pipelining, parallelism, reconfigurability) drive compute and energy efficiency; pick low-power devices and prune non-essential logic.
