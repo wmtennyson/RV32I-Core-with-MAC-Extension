@@ -56,7 +56,7 @@ _**Implementation of CPUs and DSP Accelerators on FPGA**_
            https://dl.acm.org/doi/10.1145/3284357
 
 _**Hardware Acceleration of Dot Product / Convolution**_ 
-- In-Datacenter Performance Analysis of a Tensor Processing Unit — Norman P. Jouppi et al., ISCA, 2017.
+- ~~In-Datacenter Performance Analysis of a Tensor Processing Unit — Norman P. Jouppi et al., ISCA, 2017.~~ (Gio)
            https://dl.acm.org/doi/10.1145/3079856.3080246
 - FPGA-Based Acceleration for Convolutional Neural Networks: A Comprehensive Review — Junye Jiang et al., arXiv preprint, 2025.
            https://arxiv.org/pdf/2505.13461
