@@ -3,7 +3,53 @@
 ### In-Datacenter Performance Analysis of a Tensor Processing Unit
 
 - **Citation:** Jouppi, Norman P., et al. "In-datacenter performance analysis of a tensor processing unit." Proceedings of the 44th annual international symposium on computer architecture. 2017.
-- **Description:** This paper dissects Google’s first TPU, a domain-specific inference accelerator whose center is a 256×256 systolic array of 8-bit MACs backed by a 24 MiB on-chip buffer and dedicated weight DRAM. By quantizing models and pushing massive int8 matrix math through a deterministic pipeline, the TPU meets strict p99 latency targets typical of user-facing services. In head-to-head production workloads (MLPs, LSTMs, CNNs), a TPU die is about 14–15× faster than a CPU die and ~13× faster than a K80 GPU die, with performance per watt that is 17–34× (total) or 41–83× (incremental) better than CPU and 25–29× better than GPU. Roofline analysis shows most MLP/LSTM inference is limited by memory bandwidth while CNNs are compute-bound; thus, memory bandwidth—and not merely clock or array size—is the key lever. Indeed, moving the TPU’s weight memory to GDDR5 would triple delivered TOPS and push perf/W to ~70× GPU and ~200× CPU. The broader message is that packing many small MACs and orchestrating data movement carefully beats general-purpose tricks for latency-bound inference: systolic arrays, big local SRAMs, and predictable execution deliver large, real-world speedups with excellent energy efficiency.
+- **Description:** The paper studies Google’s first-gen Tensor Processing Unit (TPU), a PCIe coprocessor built specifically for neural-network inference. Its heart is a 256×256 systolic array of 8-bit MACs (≈92 TOPS) fed by a large software-managed on-chip buffer and an 8 GiB weight DRAM. The TPU’s deterministic pipeline and local dataflow let it honor strict p99 latency targets that constrain CPUs/GPUs to small batches. On six production DNNs (MLPs, LSTMs, CNNs) covering ~95% of demand, the TPU die delivers around 15× the K80 GPU die’s performance (weighted) and order-of-magnitude better energy efficiency at the server level. Roofline analysis shows MLPs/LSTMs are memory-bound on TPU while CNNs are compute-bound, making memory bandwidth the dominant tuning knob; simply enlarging the MAC array can backfire due to tiling/fragmentation. Using GPU-class GDDR5 would have tripled achieved TOPS and pushed perf/W to ~70× GPU and ~200× CPU. The overarching lesson for hardware acceleration of dot products/convolutions: pack many small int8 MACs, keep data local, orchestrate systolic flow, and design for tail-latency—that combination yields large, real-world gains in both speed and energy.
+
+#### Abstract (key takeaways)
+- TPU = a domain-specific ASIC for NN inference (not training), first deployed in 2015.
+- Core is a 65,536-MAC, 8-bit matrix-multiply unit (≈92 TOPS peak) with a large on-chip memory managed by software.
+- Deterministic, single-threaded execution favors p99 latency targets vs. CPU/GPU features that boost averages but hurt tail latency.
+- On real production workloads (MLP, CNN, LSTM), TPU is ~15–30× faster than contemporary CPU/GPU and ~30–80× better in TOPS/Watt; with GDDR5-class memory, ~3× higher TOPS and ~70×/200× perf/W vs. GPU/CPU projected.
+#### 1) TPU Origin, Architecture, Implementation, and Software
+- Motivation: 2013 projections (voice search, etc.) would double DC compute on CPUs; team built an inference ASIC in 15 months.
+- Integration model: TPU is a PCIe coprocessor (closer to an FPU than a GPU); host sends instructions, simplifying HW + deployment.
+- Goal: run whole models on-device to reduce host interaction; internal paths are wide (256-byte) for high throughput.
+- Block diagram highlights: Matrix Multiply Unit (256×256 MACs), Accumulators (4 MiB), Unified Buffer (24–28 MiB), Weight FIFO streaming from 8 GiB Weight DRAM.
+- ISA flavor: a small CISC-like set; five key ops—Read_Host_Memory, Read_Weights, MatrixMultiply/Convolve, Activate (ReLU/sigmoid/pooling), Write_Host_Memory.
+- Microarch philosophy: keep the matrix unit busy, overlap non-matrix work, and use systolic execution to cut power-hungry SRAM traffic.
+#### 2) Matrix Unit & Dataflow Details
+- 256×256 MAC array does 8-bit multiplies; 16-bit products accumulate in 32-bit registers (4 MiB total).
+- Supports matrix-multiply and convolution; one 64 KiB weight tile (double-buffered) to hide shift latency. Designed for dense matrices.
+- Operates at half/quarter speed when activations/weights are 16-bit (mix or both).
+- Systolic wavefront: activations in from left, weights from top; diagonal wavefront updates accumulators—software is functionally unaware but must mind unit latency for performance.
+#### 3) Platforms & Workload (what they measured)
+- Workload: six production models (2×MLP, 2×LSTM, 2×CNN) covering ~95% of inference demand (e.g., RankBrain, Translate subset, Inception, AlphaGo).
+- Benchmarked platforms: Haswell CPU, NVIDIA K80 GPU, TPU, all 2015-era DC configurations with ECC, etc.
+#### 4) Performance Analysis (Rooflines & Latency Reality)
+- TPU roofline “ridge” at ~1350 MACs/byte of weight traffic: MLP/LSTM are memory-bound, CNNs compute-bound on TPU.
+- CPUs/GPUs sit further below their peaks because p99 latency caps batch size, prioritizing latency over throughput.
+- Example: MLP0 p99 ≤ 7 ms; at that cap, Haswell/K80 use ~42%/37% of their achievable throughput, TPU ~80%.
+- Weighted means (actual mix): TPU die ~15.3× GPU die perf (both include host overhead).
+#### 5) Cost-Performance & Performance/Watt (TCO Proxy)
+- They use performance/Watt as a proxy for TCO (publishable), comparing whole servers.
+- Results: TPU server 17–34× CPU (total), 41–83× CPU (incremental); ~25–29× GPU (incremental).
+#### 6) Energy Proportionality
+- Measured power vs. utilization (0–100%) across platforms; the TPU has low absolute power but imperfect proportionality—still, CPU+4×TPU yields large speedups at modest power.
+#### 7) Alternative TPU Designs (what matters most)
+- Performance model agrees with HW counters (≤~10% error); then sweep parameters. Biggest lever = memory bandwidth: 4× BW → ~3× perf.
+- Raising clock helps CNNs (compute-bound) but little for MLP/LSTM (memory-bound).
+- Making the array larger (512×512) can slightly hurt—tiling inefficiency outweighs fewer steps (2-D fragmentation).
+- Unified Buffer usage was improved by software; peak models now fit in ~14 MiB (from 24 MiB).
+#### 8) Discussion / Lessions (a few "fallacies")
+- Don’t focus only on CNNs—they were ~5% of DC inference then; MLP/LSTM dominate.
+- IPS is a poor single metric; it’s more a function of the model than the hardware.
+- Inference is latency-bound, so architectures must perform well under 99th-percentile constraints.
+#### 9) Related Work (very briefly)
+- Compared with FPGA “Catapult”: CNN speedups 2.3–7× (maybe 17×) vs. server, but TPU sees 40–70× vs. a somewhat faster server—and is programmed at a higher level (TensorFlow) rather than Verilog.
+#### 10) Conclusion
+- Even with some memory-bound under-utilization, “a small fraction of a huge resource can still be big” → roofline shows massive cost-effective gains. (They call this the Cornucopia Corollary to Amdahl’s Law.)
+- TPU packs 25× more MACs and 3.5× more on-chip memory than K80, yet uses <½ the power; 8-bit systolic MACs are drastically cheaper in energy/area than 32-bit FP.
+- Expectation: TPU becomes an archetype for domain-specific accelerators; successors will push further.
 
 
 ### FPGA-Based Acceleration for Convolutional Neural Networks: A Comprehensive Review
