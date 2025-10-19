@@ -46,7 +46,7 @@ _**RISC-V Custom DSP Extensions**_
 _**Soft-Core CPU Design for DSP Applications**_ 
 - ~~The iDEA DSP Block-Based Soft Processor for FPGAs — Hui Yan Cheah, Fredrik Brosser, Suhaib A. Fahmy, Douglas L. Maskell, ACM TRETS, 2014.~~ (Alex)
            https://dl.acm.org/doi/abs/10.1145/2629443
-- IPPro: FPGA-Based Image Processing Processor — Fahad M. Siddiqui et al., IEEE SiPS Workshop 2014; extended in Journal of Signal Processing Systems, 2017.
+- ~~IPPro: FPGA-Based Image Processing Processor — Fahad M. Siddiqui et al., IEEE SiPS Workshop 2014; extended in Journal of Signal Processing Systems, 2017.~~ (Will)
            https://pureadmin.qub.ac.uk/ws/portalfiles/portal/12692968/PID3359731.pdf
   
 _**Implementation of CPUs and DSP Accelerators on FPGA**_ 
