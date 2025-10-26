@@ -36,7 +36,7 @@ _**Fixed-Point Arithemtic **_
            https://ieeexplore.ieee.org/document/5548561
   
 _**RISC-V Custom DSP Extensions**_ 
-- A Near-Threshold RISC-V Core with DSP Extensions for Scalable IoT Endpoint Devices — Michael Gautschi et al., IEEE Transactions on VLSI Systems, 2017.
+- ~~A Near-Threshold RISC-V Core with DSP Extensions for Scalable IoT Endpoint Devices — Michael Gautschi et al., IEEE Transactions on VLSI Systems, 2017.~~ (Aidan) 
            https://ieeexplore.ieee.org/document/7864441         
 - ~~Designing RISC-V Instruction Set Extensions for Artificial Neural Networks: An LLVM Compiler-Driven Perspective — K.K. Balasubramanian et al., IEEE Access, 2024.~~ (Willy)
            https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=10501937
