@@ -40,7 +40,7 @@ _**RISC-V Custom DSP Extensions**_
            https://ieeexplore.ieee.org/document/7864441         
 - ~~Designing RISC-V Instruction Set Extensions for Artificial Neural Networks: An LLVM Compiler-Driven Perspective — K.K. Balasubramanian et al., IEEE Access, 2024.~~ (Willy)
            https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=10501937
-- ~~EXTREM-EDGE: Extensions to RISC-V for Energy-Efficient ML Inference at the Edge — Vaibhav Verma, Trevor M. Tracy, Mircea R. Stan, IGSC Conference, 2021.~~
+- ~~EXTREM-EDGE: Extensions to RISC-V for Energy-Efficient ML Inference at the Edge — Vaibhav Verma, Trevor M. Tracy, Mircea R. Stan, IGSC Conference, 2021.~~ (Aidan)
            https://www.sciencedirect.com/science/article/pii/S2210537922000749
   
 _**Soft-Core CPU Design for DSP Applications**_ 
