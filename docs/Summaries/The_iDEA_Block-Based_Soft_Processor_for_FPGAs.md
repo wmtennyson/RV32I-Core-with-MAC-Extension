@@ -27,3 +27,5 @@
 
 - Multiplication and shift to be efficiently performed
 
+**How can it Help Our Project**
+This article can help us with our project as we start developing our own block diagram, the block diagrams provided can give us a sense of what we can implent into ours.  Using iDEA extention or something similar can be a key into developing our DSP block diagram.
