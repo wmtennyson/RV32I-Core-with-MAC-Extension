@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wave_config>
+   <wave_state>
+   </wave_state>
+   <db_ref_list>
+      <db_ref path="tb_fetch_unit_behav.wdb" id="1">
+         <top_modules>
+            <top_module name="glbl" />
+            <top_module name="tb_fetch_unit" />
+         </top_modules>
+      </db_ref>
+   </db_ref_list>
+   <zoom_setting>
+      <ZoomStartTime time="0.000 ns"></ZoomStartTime>
+      <ZoomEndTime time="194.576 ns"></ZoomEndTime>
+      <Cursor1Time time="135.948 ns"></Cursor1Time>
+   </zoom_setting>
+   <column_width_setting>
+      <NameColumnWidth column_width="212"></NameColumnWidth>
+      <ValueColumnWidth column_width="62"></ValueColumnWidth>
+   </column_width_setting>
+   <WVObjectSize size="21" />
+   <wvobject type="divider" fp_name="divider248">
+      <obj_property name="label">GLOBAL AND CTRL</obj_property>
+      <obj_property name="DisplayName">label</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_fetch_unit/DUT/clk" type="logic">
+      <obj_property name="ElementShortName">clk</obj_property>
+      <obj_property name="ObjectShortName">clk</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_fetch_unit/DUT/rst" type="logic">
+      <obj_property name="ElementShortName">rst</obj_property>
+      <obj_property name="ObjectShortName">rst</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_fetch_unit/DUT/stall_i" type="logic">
+      <obj_property name="ElementShortName">stall_i</obj_property>
+      <obj_property name="ObjectShortName">stall_i</obj_property>
+      <obj_property name="CustomSignalColor">#FF0000</obj_property>
+      <obj_property name="UseCustomSignalColor">true</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_fetch_unit/DUT/flush_i" type="logic">
+      <obj_property name="ElementShortName">flush_i</obj_property>
+      <obj_property name="ObjectShortName">flush_i</obj_property>
+   </wvobject>
+   <wvobject type="divider" fp_name="divider249">
+      <obj_property name="label">FETCH ADDR</obj_property>
+      <obj_property name="DisplayName">label</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_fetch_unit/DUT/pc_f" type="array">
+      <obj_property name="ElementShortName">pc_f[31:0]</obj_property>
+      <obj_property name="ObjectShortName">pc_f[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_fetch_unit/DUT/bram_addr_o" type="array">
+      <obj_property name="ElementShortName">bram_addr_o[31:0]</obj_property>
+      <obj_property name="ObjectShortName">bram_addr_o[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_fetch_unit/DUT/pc_next" type="array">
+      <obj_property name="ElementShortName">pc_next[31:0]</obj_property>
+      <obj_property name="ObjectShortName">pc_next[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="divider" fp_name="divider253">
+      <obj_property name="label">MEM RETURN</obj_property>
+      <obj_property name="DisplayName">label</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_fetch_unit/DUT/bram_rdata_i" type="array">
+      <obj_property name="ElementShortName">bram_rdata_i[31:0]</obj_property>
+      <obj_property name="ObjectShortName">bram_rdata_i[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="divider" fp_name="divider255">
+      <obj_property name="label">SKID &amp; ALIGNMENT</obj_property>
+      <obj_property name="DisplayName">label</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_fetch_unit/DUT/pc_d" type="array">
+      <obj_property name="ElementShortName">pc_d[31:0]</obj_property>
+      <obj_property name="ObjectShortName">pc_d[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_fetch_unit/DUT/skid_valid" type="logic">
+      <obj_property name="ElementShortName">skid_valid</obj_property>
+      <obj_property name="ObjectShortName">skid_valid</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_fetch_unit/DUT/skid_instr" type="array">
+      <obj_property name="ElementShortName">skid_instr[31:0]</obj_property>
+      <obj_property name="ObjectShortName">skid_instr[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_fetch_unit/DUT/skid_pc" type="array">
+      <obj_property name="ElementShortName">skid_pc[31:0]</obj_property>
+      <obj_property name="ObjectShortName">skid_pc[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_fetch_unit/DUT/skid_valid_data" type="logic">
+      <obj_property name="ElementShortName">skid_valid_data</obj_property>
+      <obj_property name="ObjectShortName">skid_valid_data</obj_property>
+   </wvobject>
+   <wvobject type="divider" fp_name="divider261">
+      <obj_property name="label">FINAL OUTPUT</obj_property>
+      <obj_property name="DisplayName">label</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_fetch_unit/DUT/instr_valid_o" type="logic">
+      <obj_property name="ElementShortName">instr_valid_o</obj_property>
+      <obj_property name="ObjectShortName">instr_valid_o</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_fetch_unit/DUT/instr_o" type="array">
+      <obj_property name="ElementShortName">instr_o[31:0]</obj_property>
+      <obj_property name="ObjectShortName">instr_o[31:0]</obj_property>
+      <obj_property name="CustomSignalColor">#00FFFF</obj_property>
+      <obj_property name="UseCustomSignalColor">true</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_fetch_unit/DUT/pc_o" type="array">
+      <obj_property name="ElementShortName">pc_o[31:0]</obj_property>
+      <obj_property name="ObjectShortName">pc_o[31:0]</obj_property>
+   </wvobject>
+</wave_config>
