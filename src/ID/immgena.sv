@@ -1,6 +1,5 @@
 `timescale 1ns / 1ps
 
-
 module immgena(
     input  logic [31:0] instr_i,
     output logic [31:0] imm_o
