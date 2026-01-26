@@ -49,17 +49,11 @@ module EXE_ALU(
             `SLL  : alu_out = OpA << shamt;                                         // Shift Left Logical
             `SRL  : alu_out = OpA >> shamt;                                         // Shift Right Logical
             `SRA  : alu_out = $signed(OpA) >>> shamt;                               // Arithmetic Right Shift, Signed 
-            `less_than  : alu_out = {31'b0, ($signed(OpA) < $signed(OpB))};         // Signed Less-Than
-            `less_than_unsigned : alu_out = {31'b0, OpA < OpB};                     // Unsinged Less-Than
-            `greater_than  : alu_out = {31'b0, ($signed(OpA) >= $signed(OpB))};      // Signed Greater-Than
-            `greater_than_unsigned : alu_out = {31'b0, OpA >= OpB};                  // Unsinged Greater-Than 
-            `equal  : alu_out = {31'b0, OpA == OpB};                                // Bit Patterns Equal
-            `not_equal: alu_out = {31'b0, OpA != OpB};                              // Bit Patterns Not Equal
-            `pc_plus_4: alu_out = OpA + 32'd4;                                      
-             default : alu_out = '0;                                                // Error
+            `SLT  : alu_out = {31'b0, ($signed(OpA) < $signed(OpB))};               // Set Signed Less-Than
+            `SLTU : alu_out = {31'b0, OpA < OpB};                                   // Set Unsinged Less-Than
+             default : ;                                                            // Error
                 
         endcase
     end
 
 endmodule
-
