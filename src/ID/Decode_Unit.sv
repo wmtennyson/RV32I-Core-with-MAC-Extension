@@ -1,7 +1,7 @@
 `include "Def.vh"
 `timescale 1ns / 1ps
 
-module decodeunit(
+module Decode_Unit(
     input  logic        clk,
     input  logic        rst,
 
