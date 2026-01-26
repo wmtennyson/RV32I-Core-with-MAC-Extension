@@ -98,7 +98,7 @@ module Decode_Unit(
         .OpA_sel    (OpA_sel_1b_d), // NOTE: 1-bit in your current CU
         .OpB_sel    (OpB_sel_d),
         .lui        (lui_d),
-        .pcsrc      (pcsrc_d),
+        .is_jalr    (pcsrc_d),
         .alu_op     (alu_op_d)
     );
 
