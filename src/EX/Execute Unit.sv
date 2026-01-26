@@ -35,8 +35,8 @@ module Execute_Unit(
                     imm,
     
     // Inputs for ALU Control Unit
-    input logic [14:12] func3,
-    input logic [31:25] func7,
+    input logic [2:0] func3,
+    input logic [6:0] func7,
     input logic [2:0]   alu_op,
     
     // Control Signals for Muxltiplexers
@@ -59,6 +59,12 @@ module Execute_Unit(
     
     // Operand Selection Logic
     always_comb begin
+    
+        // Safe defaults (no forwarding, normal operand usage)
+        RS1 = RS1_IDEXE;
+        RS2 = RS2_IDEXE;
+        OpA = RS1_IDEXE;
+        OpB = RS2_IDEXE;
             
         // First-Layer Forwarding Multiplexers - Inputs from Multiplexer for RS1 and RS2
         // Select the Input for RS1_Sel Mux
@@ -66,7 +72,7 @@ module Execute_Unit(
             2'b00 : RS1 = RS1_IDEXE;
             2'b01 : RS1 = RS1_EXEMEM;
             2'b10 : RS1 = RS1_MEMWB;
-            default : RS1 = '0;
+            default : ;
         endcase
         
         // Select the Input for RS2_Sel Mux
@@ -74,7 +80,7 @@ module Execute_Unit(
             2'b00 : RS2 = RS2_IDEXE;
             2'b01 : RS2 = RS2_EXEMEM;
             2'b10 : RS2 = RS2_MEMWB;
-            default : RS2 = '0;
+            default : ;
         endcase
         
         // Second-Layer Operand Multiplexers - Input from Multiplexer for OpA and OpB
@@ -83,30 +89,30 @@ module Execute_Unit(
             2'b00 : OpA = PC;
             2'b01 : OpA = PC4;
             2'b10 : OpA = RS1;
-            default : OpA = '0;
+            default : ;
         endcase
         
         // Select the Input for OpB_Sel Mux
         unique case(OpB_sel)
             1'b0 : OpB = RS2;
             1'b1 : OpB = imm;
-            default : OpB = '0;
+            default : ;
         endcase
     end 
       
     // Instantiate ALU Control to Send to ALU
     EXE_Control ALU_ctrl(
-        .func3        (func3),
-        .func7        (func7),
-        .alu_op      (alu_op),
-        .alu_ctrl  (alu_ctrl)
+        .func3      (func3),
+        .func7      (func7),
+        .alu_op     (alu_op),
+        .alu_ctrl   (alu_ctrl)
     );
       
     // Instantiate the ALU for final ALU_Out      
     EXE_ALU ALU(
-        .OpA            (OpA),
-        .OpB            (OpB),
-        .alu_ctrl  (alu_ctrl),
+        .OpA        (OpA),
+        .OpB        (OpB),
+        .alu_ctrl   (alu_ctrl),
         .alu_out    (alu_out)
     );
   
