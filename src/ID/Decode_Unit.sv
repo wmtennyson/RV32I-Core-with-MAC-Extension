@@ -63,7 +63,7 @@ module Decode_Unit(
     // --------- Regfile read ----------
     logic [31:0] rs1_val, rs2_val;
 
-    RegFile32 rf (
+    regfile rf (
         .clk     (clk),
         .rst     (rst),
         .we_i    (wb_we_i),
