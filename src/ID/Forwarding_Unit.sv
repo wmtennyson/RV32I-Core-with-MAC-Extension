@@ -1,24 +1,4 @@
 `timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: William Tennyson
-// 
-// Create Date: 01/26/2026 11:58:54 AM
-// Design Name: 
-// Module Name: Forwarding_Unit
-// Project Name: 32 Bit CPU 
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: 
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
-
 
 module Forwarding_Unit(
     // Inputs
