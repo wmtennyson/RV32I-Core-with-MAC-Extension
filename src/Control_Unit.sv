@@ -1,25 +1,5 @@
 `include "Def.vh"
 `timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: Senior Project
-// Engineer: William Tennyson
-// 
-// Create Date: 01/11/2026 07:38:49 PM
-// Design Name: CPU High Level View
-// Module Name: Control_Unit
-// Project Name: Senior Project 32-Bit CPU
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: 
-// 
-// Revision: 0
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
-
 
 module Control_Unit(
     // Inputs 
