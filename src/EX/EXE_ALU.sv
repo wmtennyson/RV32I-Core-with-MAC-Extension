@@ -1,24 +1,5 @@
 `include "Def.vh"
 `timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: Senior Project
-// Engineer: William Tennyson
-// 
-// Create Date: 01/10/2026 04:12:31 PM
-// Design Name: Execute Unit
-// Module Name: EXE_ALU
-// Project Name: 32-Bit CPU with MAC Extension
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: N/A     
-// 
-// Revision: 0
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
 
 module EXE_ALU(
         // Inputs
