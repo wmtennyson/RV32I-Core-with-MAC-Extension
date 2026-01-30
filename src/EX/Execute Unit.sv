@@ -1,24 +1,4 @@
 `timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: Senior Project
-// Engineer: William Tennyson
-// 
-// Create Date: 01/11/2026 09:32:34 PM
-// Design Name: Execute unit
-// Module Name: Execute Unit
-// Project Name: Senior Project 32-Bit CPU
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: Forwarding_Unit.sv, Control_Unit.sv, ID_EXE_Reg.sv, EXE_MEM_Reg.sv
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
-
 
 module Execute_Unit(
     // Inputs for Operand A
