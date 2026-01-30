@@ -1,24 +1,5 @@
 `include "Def.vh"
 `timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: Senior Project
-// Engineer: William Tennyson
-// 
-// Create Date: 01/10/2026 04:12:31 PM
-// Design Name: Instruction Decode Stage
-// Module Name: Branch Unit
-// Project Name: 32-Bit CPU with MAC Extension
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: N/A     
-// 
-// Revision: 0
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
 
 module Branch_Unit(
     input  logic [31:0] pc,
@@ -74,5 +55,6 @@ module Branch_Unit(
             target_pc = pc4;                                            // fall-through
         end
     end
+
 
 endmodule
