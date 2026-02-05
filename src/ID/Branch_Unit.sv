@@ -2,18 +2,21 @@
 `timescale 1ns / 1ps
 
 module Branch_Unit(
+    // Inputs
     input  logic [31:0] pc,
-    input  logic [31:0] pc4,
-    input  logic [31:0] rs1,
-    input  logic [31:0] rs2,
-    input  logic [31:0] imm,
+                        pc4,
+                        rs1,
+                        rs2,
+                        imm,
     input  logic        branch,
-    input  logic        jump,
-    input  logic        pcsrc,      // 1 for JALR, 0 for JAL
+                        jump,
+                        pcsrc,      // 1 for JALR, 0 for JAL
     input  logic [2:0]  funct3,
+    
+    // Outputs
     output logic        redirect,
     output logic [31:0] target_pc,
-    output logic [31:0] link_register
+                        link_register
 );
 
     logic result;
@@ -58,3 +61,4 @@ module Branch_Unit(
 
 
 endmodule
+
