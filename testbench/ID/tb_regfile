@@ -1,0 +1,69 @@
+`timescale 1ns/1ps
+
+module tb_regfile;
+
+  logic clk, rst;
+  logic we_i;
+  logic [4:0]  waddr_i, raddr1_i, raddr2_i;
+  logic [31:0] wdata_i;
+  logic [31:0] rdata1_o, rdata2_o;
+
+  regfile dut (
+    .clk(clk), .rst(rst),
+    .we_i(we_i), .waddr_i(waddr_i), .wdata_i(wdata_i),
+    .raddr1_i(raddr1_i), .raddr2_i(raddr2_i),
+    .rdata1_o(rdata1_o), .rdata2_o(rdata2_o)
+  );
+
+  // 10 ns clock
+  initial clk = 0;
+  always #5 clk = ~clk;
+
+  initial begin
+    // init
+    rst = 1;
+    we_i = 0;
+    waddr_i = 0; wdata_i = 0;
+    raddr1_i = 0; raddr2_i = 0;
+
+    // hold reset through 2 posedges, then deassert NOT on an edge
+    repeat (2) @(posedge clk);
+    #1 rst = 0;
+
+    // ---- WRITE x1 = 42 ----
+    // set up write signals BEFORE the posedge
+    @(negedge clk);
+    we_i    = 1;
+    waddr_i = 5'd1;
+    wdata_i = 32'd42;
+
+    // wait for the posedge where the write happens
+    @(posedge clk);
+    #1;          // small settle time after clock edge
+    we_i = 0;    // turn off write AFTER the edge
+
+    // ---- READ x1 ----
+    raddr1_i = 5'd1;
+    #1;
+    if (rdata1_o !== 32'd42) $fatal("FAIL: x1 expected 42, got %0d", rdata1_o);
+
+    // ---- WRITE x0 (should be ignored) ----
+    @(negedge clk);
+    we_i    = 1;
+    waddr_i = 5'd0;
+    wdata_i = 32'd99;
+
+    @(posedge clk);
+    #1;
+    we_i = 0;
+
+    // ---- READ x0 ----
+    raddr1_i = 5'd0;
+    #1;
+    if (rdata1_o !== 32'd0) $fatal("FAIL: x0 expected 0, got %0d", rdata1_o);
+
+    $display("PASS ✅ regfile test passed");
+    $finish;
+  end
+
+endmodule
