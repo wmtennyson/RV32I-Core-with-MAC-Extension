@@ -1,15 +1,6 @@
 `include "Def.vh"
 `timescale 1ns/1ps
 
-// -----------------------------------------------------------------------------
-// Decode Unit (ID stage)
-// - Parses instruction fields
-// - Reads regfile (with WB write port)
-// - Generates immediate + control signals
-// - Performs branch/jump decision in ID (with simple forwarding for compare)
-// - Generates stall (load-use / sync-BRAM-friendly 2-deep load hazard)
-// - Registers outputs into ID/EX pipeline regs (inserts bubble on stall/flush)
-// -----------------------------------------------------------------------------
 module decodeunit (
     input  logic        clk,
     input  logic        rst,
@@ -32,23 +23,23 @@ module decodeunit (
     input  logic [4:0]  id_ex_rs2_i,
     input  logic        id_ex_regwrite_i,
     input  logic        id_ex_mem_read_i,
-    input  logic [31:0] ex_alu_out_i,        // "EX result exists now" (for branch fwd = 11)
+    input  logic [31:0] ex_alu_out_i,        
 
     // Instruction currently in MEM stage (EX/MEM regs)
     input  logic [4:0]  ex_mem_rd_i,
     input  logic        ex_mem_regwrite_i,
     input  logic        ex_mem_mem_read_i,
-    input  logic [31:0] ex_mem_alu_out_i,    // for branch fwd = 10
+    input  logic [31:0] ex_mem_alu_out_i,   
 
     // WB stage (MEM/WB regs)
     input  logic [4:0]  mem_wb_rd_i,
     input  logic        mem_wb_regwrite_i,
-    input  logic [31:0] mem_wb_value_i,      // the value that will be written back (for fwd = 01)
+    input  logic [31:0] mem_wb_value_i,     
 
     // To Fetch (hazard / redirect)
-    output logic        stall_o,             // freeze PC + IF/ID (connect to fetch_unit.stall_i)
-    output logic        flush_o,             // branch/jump taken (connect to fetch_unit.flush_i)
-    output logic [31:0] branch_target_o,     // connect to fetch_unit.branch_target_i
+    output logic        stall_o,            
+    output logic        flush_o,             
+    output logic [31:0] branch_target_o,    
 
     // ID/EX pipeline register outputs (to Execute stage and beyond)
     output logic        id_ex_valid_o,
@@ -71,24 +62,20 @@ module decodeunit (
     output logic        id_ex_mem_write_o,
     output logic        id_ex_branch_o,
     output logic        id_ex_jump_o,
-    output logic        id_ex_write_data_o,  // Mem->WB select (from your Control_Unit)
+    output logic        id_ex_write_data_o,  
     output logic        id_ex_lui_o,
     output logic        id_ex_is_jalr_o,
     output logic [2:0]  id_ex_alu_op_o,
 
     // Execute operand selects / forwarding selects
-    output logic [1:0]  id_ex_opA_sel_o,     // 00=PC, 01=PC4, 10=RS1 (matches your Execute_Unit)
-    output logic        id_ex_opB_sel_o,     // 0=RS2, 1=IMM
-    output logic [1:0]  id_ex_rs1_sel_o,     // to Execute_Unit
-    output logic [1:0]  id_ex_rs2_sel_o      // to Execute_Unit
+    output logic [1:0]  id_ex_opA_sel_o,    
+    output logic        id_ex_opB_sel_o,     
+    output logic [1:0]  id_ex_rs1_sel_o,   
+    output logic [1:0]  id_ex_rs2_sel_o     
 );
-
-    // RISC-V NOP: addi x0, x0, 0
     localparam logic [31:0] NOP_INSTR = 32'h0000_0013;
 
-    // -------------------------
     // Field decode
-    // -------------------------
     logic [6:0] opcode;
     logic [4:0] rd, rs1, rs2;
     logic [2:0] funct3;
@@ -101,9 +88,7 @@ module decodeunit (
     assign rs2    = instr_i[24:20];
     assign funct7 = instr_i[31:25];
 
-    // -------------------------
     // Regfile read
-    // -------------------------
     logic [31:0] rs1_rf, rs2_rf;
 
     RegFile32 RF (
@@ -118,9 +103,7 @@ module decodeunit (
         .rdata2_o (rs2_rf)
     );
 
-    // -------------------------
     // Immediate generator
-    // -------------------------
     logic [31:0] imm_d;
 
     ImmGen IG (
@@ -128,9 +111,7 @@ module decodeunit (
         .imm_o   (imm_d)
     );
 
-    // -------------------------
     // Control decode
-    // -------------------------
     logic        regwrite_d,
                  mem_read_d,
                  mem_write_d,
@@ -193,9 +174,7 @@ module decodeunit (
         end
     end
 
-    // -------------------------
     // Forwarding for branch compare (ID-stage)
-    // -------------------------
     logic [1:0] BrFwd_A, BrFwd_B;
     logic [1:0] RS1_Sel_d, RS2_Sel_d;
 
@@ -245,9 +224,7 @@ module decodeunit (
         endcase
     end
 
-    // -------------------------
     // Branch / Jump decision in ID
-    // -------------------------
     logic        redirect_d;
     logic [31:0] target_pc_d;
     logic [31:0] link_pc_d;
@@ -267,13 +244,10 @@ module decodeunit (
         .link_register (link_pc_d)
     );
 
-    assign flush_o         = redirect_d;     // taken branch or any jump
+    assign flush_o         = redirect_d;   
     assign branch_target_o = target_pc_d;
 
-    // -------------------------
     // Hazard detection -> stall
-    // (Designed to be safe with sync BRAM loads: stalls on load in EX and EX/MEM)
-    // -------------------------
     logic uses_rs1, uses_rs2;
 
     always_comb begin
@@ -326,25 +300,16 @@ module decodeunit (
         else         stall_o = hazard_ex_load | hazard_mem_load;
     end
 
-    // -------------------------
-    // Build ID->EX selects (match your Execute_Unit)
-    // opA_sel: 00=PC, 01=PC4, 10=RS1
-    // Using Control_Unit.OpA_sel as "use PC" (works for AUIPC; PC4 option left unused here)
-    // -------------------------
     logic [1:0] opA_sel_d;
 
     always_comb begin
-        opA_sel_d = 2'b10; // default RS1
+        opA_sel_d = 2'b10;
 
         // If CU requests PC-based A operand (AUIPC), use PC
         if (opA_sel_bit_d) opA_sel_d = 2'b00;
-
-        // (Optional) If you ever want PC4 as OpA, set opA_sel_d = 2'b01 for those opcodes.
     end
 
-    // -------------------------
     // ID/EX pipeline register (bubble on stall/invalid, bubble on flush)
-    // -------------------------
     task automatic set_idex_nop();
         begin
             id_ex_valid_o       <= 1'b0;
@@ -371,7 +336,7 @@ module decodeunit (
             id_ex_is_jalr_o     <= 1'b0;
             id_ex_alu_op_o      <= `NOP;
 
-            id_ex_opA_sel_o     <= 2'b10; // RS1 (doesn't matter when valid=0)
+            id_ex_opA_sel_o     <= 2'b10; 
             id_ex_opB_sel_o     <= 1'b0;
 
             id_ex_rs1_sel_o     <= 2'b00;
@@ -383,13 +348,10 @@ module decodeunit (
         if (rst) begin
             set_idex_nop();
         end else if (flush_o) begin
-            // Redirect: kill whatever would have gone into EX this cycle
             set_idex_nop();
         end else if (stall_o) begin
-            // Stall: hold IF/ID via fetch stall, insert bubble into EX
             set_idex_nop();
         end else if (!instr_valid_i) begin
-            // No valid instruction -> bubble
             set_idex_nop();
         end else begin
             id_ex_valid_o       <= 1'b1;
