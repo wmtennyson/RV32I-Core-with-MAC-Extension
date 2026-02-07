@@ -16,7 +16,6 @@ module Branch_Unit(
     // Outputs
     output logic        redirect,
     output logic [31:0] target_pc,
-                        link_register
 );
 
     logic result;
@@ -25,7 +24,6 @@ module Branch_Unit(
         // Defaults
         redirect      = 1'b0;
         target_pc     = pc4;
-        link_register = pc4;
 
         // Branch resultition (computed regardless, but not used unless branch=1)
         result = 1'b0;
@@ -61,4 +59,5 @@ module Branch_Unit(
 
 
 endmodule
+
 
