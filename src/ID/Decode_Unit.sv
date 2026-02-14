@@ -1,7 +1,7 @@
 `include "Def.vh"
 `timescale 1ns/1ps
 
-module decodeunit (
+module Decode_Unit (
     input  logic        clk,
     input  logic        rst,
 
@@ -91,7 +91,7 @@ module decodeunit (
     // Regfile read
     logic [31:0] rs1_rf, rs2_rf;
 
-    RegFile32 RF (
+    regfile RF (
         .clk      (clk),
         .rst      (rst),
         .we_i     (wb_we_i),
