@@ -69,7 +69,7 @@ module Hazard_Unit(
         load_use_hazard = ID_EX_mem_read && (ID_EX_rd != 5'd0) && ((ID_EX_rd == IF_ID_rs1) || (ID_EX_rd == IF_ID_rs2)); 
             
         // Check for Load-Branch Hazard 
-        load_branch_hazard = (ID_branch || ID_is_jalr) && (ID_EX_mem_read && (ID_EX_rd != 5'd0) && (((ID_EX_rd == IF_ID_rs1) || (ID_EX_rd == IF_ID_rs2))) || (EX_MEM_mem_read_i && (EX_MEM_rd != 5'd0) && ((EX_MEM_rd == IF_ID_rs1) || (EX_MEM_rd == IF_ID_rs2))));
+       load_branch_hazard = (ID_branch || ID_is_jalr) && ((ID_EX_mem_read && (ID_EX_rd != 5'd0) && ((ID_EX_rd == IF_ID_rs1) || (ID_EX_rd == IF_ID_rs2))) || (EX_MEM_mem_read_i && (EX_MEM_rd != 5'd0) && ((EX_MEM_rd == IF_ID_rs1) || (EX_MEM_rd == IF_ID_rs2))));
 
         // Hazard Unit Logic - If either hazard is high, then stall
         if (load_use_hazard || load_branch_hazard) begin
