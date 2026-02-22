@@ -1,6 +1,6 @@
 `timescale 1ns / 1ps
 
-module tb_EX_MEM_reg;
+module tb_ex_mem_reg;
 
   // -------------------------
   // DUT Inputs
@@ -33,7 +33,7 @@ module tb_EX_MEM_reg;
   // -------------------------
   // Instantiate DUT
   // -------------------------
-  EX_MEM_reg dut (
+  ex_mem_reg dut (
     .clk(clk),
     .rst(rst),
     .flush(flush),
