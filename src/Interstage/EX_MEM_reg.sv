@@ -1,6 +1,6 @@
 `timescale 1ns / 1ps
 
-module EX_MEM_reg(
+module ex_mem_reg(
     
     // Inputs
     // EX/MEM Pipeline Register - Inputs (from EX stage)
@@ -88,3 +88,4 @@ module EX_MEM_reg(
     end
     
 endmodule
+
