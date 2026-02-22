@@ -7,7 +7,7 @@
 // - Registers all ID-stage outputs into ID/EX outputs
 // - Inserts bubble (NOP) on reset/flush/stall/invalid
 // ------------------------------------------------------------
-module id_ex_pipe_reg (
+module id_ex_reg (
     input  logic        clk,
     input  logic        rst,
 
