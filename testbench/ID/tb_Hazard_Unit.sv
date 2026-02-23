@@ -1,9 +1,9 @@
 `timescale 1ns/1ps
 
-module tb_Hazard_Unit;
+module tb_Hazard_Unit_final;
 
   // -----------------------------
-  // DUT inputs
+  // DUT ports
   // -----------------------------
   logic        instr_valid_i;
   logic [6:0]  opcode_i;
@@ -15,11 +15,10 @@ module tb_Hazard_Unit;
   logic        ex_mem_mem_read_i;
   logic [4:0]  ex_mem_rd_i;
 
-  // DUT output
   logic        stall_o;
 
   // -----------------------------
-  // Opcode localparams (RISC-V)
+  // RISC-V opcodes
   // -----------------------------
   localparam logic [6:0] OP_LUI    = 7'b0110111;
   localparam logic [6:0] OP_AUIPC  = 7'b0010111;
@@ -32,7 +31,7 @@ module tb_Hazard_Unit;
   localparam logic [6:0] OP_OP     = 7'b0110011;
 
   // -----------------------------
-  // Instantiate DUT
+  // Instantiate DUT (updated hazard unit)
   // -----------------------------
   Hazard_Unit dut (
     .instr_valid_i     (instr_valid_i),
@@ -47,12 +46,12 @@ module tb_Hazard_Unit;
   );
 
   // -----------------------------
-  // Simple pass/fail scoreboard
+  // Pass/Fail bookkeeping
   // -----------------------------
   int pass_count = 0;
   int fail_count = 0;
 
-  task automatic apply_defaults();
+  task automatic defaults();
     begin
       instr_valid_i     = 1'b0;
       opcode_i          = OP_OP;
@@ -65,27 +64,34 @@ module tb_Hazard_Unit;
     end
   endtask
 
-  task automatic check_case(input logic expected, input string name);
+  task automatic check(input logic exp, input string name);
     begin
-      #1; // allow combinational settle
-      if (stall_o === expected) begin
-        pass_count++;
-        $display("PASS: %-55s | stall_o=%0b", name, stall_o);
-      end else begin
+      #1; // settle combinational logic
+
+      // Treat X/Z as fail (should always be 0 or 1)
+      if ($isunknown(stall_o)) begin
         fail_count++;
-        $display("FAIL: %-55s | expected=%0b got=%0b", name, expected, stall_o);
+        $display("FAIL: %-70s | stall_o is X/Z (%b)", name, stall_o);
+      end
+      else if (stall_o === exp) begin
+        pass_count++;
+        $display("PASS: %-70s | stall_o=%0b", name, stall_o);
+      end
+      else begin
+        fail_count++;
+        $display("FAIL: %-70s | expected=%0b got=%0b", name, exp, stall_o);
       end
     end
   endtask
 
   // -----------------------------
-  // Test sequence
+  // Tests
   // -----------------------------
   initial begin
-    apply_defaults();
+    defaults();
     #1;
 
-    // 1) instr_valid=0 should never stall (even if hazard-like signals present)
+    // 1) Invalid instruction => never stall
     instr_valid_i     = 1'b0;
     opcode_i          = OP_OP;
     rs1_i             = 5'd5;
@@ -94,118 +100,149 @@ module tb_Hazard_Unit;
     id_ex_rd_i        = 5'd5;
     ex_mem_mem_read_i = 1'b1;
     ex_mem_rd_i       = 5'd6;
-    check_case(1'b0, "Invalid instruction => no stall");
+    check(1'b0, "instr_valid=0 => no stall even if hazard-like signals present");
 
-    // 2) Classic load-use: ID/EX load rd matches rs1 of R-type => stall
-    apply_defaults();
+    // 2) Classic load-use: ID/EX load, R-type uses rs1/rs2, rd matches rs1 => stall
+    defaults();
     instr_valid_i    = 1'b1;
-    opcode_i         = OP_OP;      // R-type uses rs1,rs2
-    rs1_i            = 5'd5;
-    rs2_i            = 5'd1;
+    opcode_i         = OP_OP;
+    rs1_i            = 5'd10;
+    rs2_i            = 5'd3;
     id_ex_mem_read_i = 1'b1;
-    id_ex_rd_i       = 5'd5;
-    check_case(1'b1, "ID/EX load-use (R-type) rd matches rs1 => stall");
+    id_ex_rd_i       = 5'd10;
+    check(1'b1, "ID/EX load-use (R-type) rd matches rs1 => stall");
 
-    // 3) No false stall on I-type "rs2 field" (imm[4:0]): only rs1 is used
-    //    Set rs2_i equal to ID/EX rd, but rs1_i does NOT match => should NOT stall
-    apply_defaults();
+    // 3) Classic load-use: ID/EX load, R-type rd matches rs2 => stall
+    defaults();
     instr_valid_i    = 1'b1;
-    opcode_i         = OP_OPIMM;   // I-type ALU uses rs1 only
+    opcode_i         = OP_OP;
     rs1_i            = 5'd1;
-    rs2_i            = 5'd5;       // looks like a reg, but is immediate field in real encoding
+    rs2_i            = 5'd11;
     id_ex_mem_read_i = 1'b1;
-    id_ex_rd_i       = 5'd5;
-    check_case(1'b0, "I-type uses rs1 only; rd matches rs2 field => no stall");
+    id_ex_rd_i       = 5'd11;
+    check(1'b1, "ID/EX load-use (R-type) rd matches rs2 => stall");
 
-    // 4) Classic load-use: store uses rs1 and rs2, match on rs2 => stall
-    apply_defaults();
+    // 4) I-type OP-IMM uses rs1 only: rd matches rs2 field should NOT stall (prevents false stalls)
+    defaults();
     instr_valid_i    = 1'b1;
-    opcode_i         = OP_STORE;   // store uses rs1,rs2
+    opcode_i         = OP_OPIMM;   // uses rs1 only
     rs1_i            = 5'd2;
-    rs2_i            = 5'd5;
+    rs2_i            = 5'd7;       // would be imm[4:0] in real encoding
     id_ex_mem_read_i = 1'b1;
-    id_ex_rd_i       = 5'd5;
-    check_case(1'b1, "ID/EX load-use (STORE) rd matches rs2 => stall");
+    id_ex_rd_i       = 5'd7;
+    check(1'b0, "OP-IMM uses rs1 only; rd matches rs2 field => no stall");
 
-    // 5) rd==x0 should never trigger hazard stall
-    apply_defaults();
+    // 5) I-type OP-IMM: rd matches rs1 => stall
+    defaults();
+    instr_valid_i    = 1'b1;
+    opcode_i         = OP_OPIMM;
+    rs1_i            = 5'd7;
+    rs2_i            = 5'd0;
+    id_ex_mem_read_i = 1'b1;
+    id_ex_rd_i       = 5'd7;
+    check(1'b1, "OP-IMM uses rs1; rd matches rs1 => stall");
+
+    // 6) STORE uses rs1 and rs2: rd matches rs2 => stall
+    defaults();
+    instr_valid_i    = 1'b1;
+    opcode_i         = OP_STORE;
+    rs1_i            = 5'd4;
+    rs2_i            = 5'd12;
+    id_ex_mem_read_i = 1'b1;
+    id_ex_rd_i       = 5'd12;
+    check(1'b1, "STORE uses rs1/rs2; rd matches rs2 => stall");
+
+    // 7) rd == x0 should never create hazard
+    defaults();
     instr_valid_i    = 1'b1;
     opcode_i         = OP_OP;
     rs1_i            = 5'd0;
-    rs2_i            = 5'd0;
+    rs2_i            = 5'd5;
     id_ex_mem_read_i = 1'b1;
     id_ex_rd_i       = 5'd0;
-    check_case(1'b0, "ID/EX load rd=x0 => no stall");
+    check(1'b0, "ID/EX load with rd=x0 => no stall");
 
-    // 6) EX/MEM load hazard should stall ONLY for branch/jalr (needs operand in ID)
-    //    Branch uses rs1/rs2; EX/MEM load rd matches rs1 => stall
-    apply_defaults();
+    // 8) LUI uses no regs: even if rd matches rs1/rs2, no stall
+    defaults();
+    instr_valid_i    = 1'b1;
+    opcode_i         = OP_LUI;
+    rs1_i            = 5'd9;
+    rs2_i            = 5'd9;
+    id_ex_mem_read_i = 1'b1;
+    id_ex_rd_i       = 5'd9;
+    check(1'b0, "LUI uses no regs; ID/EX load rd matches => no stall");
+
+    // 9) EX/MEM load hazard should stall ONLY for BRANCH/JALR (needs operand in ID)
+    //    BRANCH uses rs1/rs2 and needs compare in ID => stall when EX/MEM rd matches rs1
+    defaults();
     instr_valid_i     = 1'b1;
     opcode_i          = OP_BRANCH;
-    rs1_i             = 5'd7;
-    rs2_i             = 5'd8;
-    ex_mem_mem_read_i = 1'b1;
-    ex_mem_rd_i       = 5'd7;
-    check_case(1'b1, "EX/MEM load + BRANCH rd matches rs1 => stall");
-
-    // 7) EX/MEM load hazard should NOT stall for normal ALU op (consumer can wait for forwarding later)
-    apply_defaults();
-    instr_valid_i     = 1'b1;
-    opcode_i          = OP_OP;      // R-type, but NOT branch/jalr
-    rs1_i             = 5'd7;
-    rs2_i             = 5'd1;
-    ex_mem_mem_read_i = 1'b1;
-    ex_mem_rd_i       = 5'd7;
-    check_case(1'b0, "EX/MEM load + R-type rd matches rs1 => no stall (not branch/jalr)");
-
-    // 8) EX/MEM load hazard + JALR base register needed in ID => stall
-    apply_defaults();
-    instr_valid_i     = 1'b1;
-    opcode_i          = OP_JALR;    // needs rs1 in ID for target
-    rs1_i             = 5'd7;
-    rs2_i             = 5'd0;
-    ex_mem_mem_read_i = 1'b1;
-    ex_mem_rd_i       = 5'd7;
-    check_case(1'b1, "EX/MEM load + JALR rd matches rs1 => stall");
-
-    // 9) JAL uses no rs1/rs2 => never stalls even if ex_mem_rd matches
-    apply_defaults();
-    instr_valid_i     = 1'b1;
-    opcode_i          = OP_JAL;     // uses_rs1=0 uses_rs2=0
-    rs1_i             = 5'd7;
+    rs1_i             = 5'd6;
     rs2_i             = 5'd7;
     ex_mem_mem_read_i = 1'b1;
-    ex_mem_rd_i       = 5'd7;
-    check_case(1'b0, "JAL uses no regs; EX/MEM load rd matches => no stall");
+    ex_mem_rd_i       = 5'd6;
+    check(1'b1, "EX/MEM load + BRANCH rd matches rs1 => stall");
 
-    // 10) Both hazards present: ID/EX load-use should stall regardless
-    apply_defaults();
+    // 10) EX/MEM load + BRANCH rd matches rs2 => stall
+    defaults();
     instr_valid_i     = 1'b1;
-    opcode_i          = OP_BRANCH; // uses rs1/rs2 and needs operand in ID
+    opcode_i          = OP_BRANCH;
+    rs1_i             = 5'd1;
+    rs2_i             = 5'd8;
+    ex_mem_mem_read_i = 1'b1;
+    ex_mem_rd_i       = 5'd8;
+    check(1'b1, "EX/MEM load + BRANCH rd matches rs2 => stall");
+
+    // 11) EX/MEM load + R-type (not branch/jalr) should NOT stall (gated)
+    defaults();
+    instr_valid_i     = 1'b1;
+    opcode_i          = OP_OP;
+    rs1_i             = 5'd6;
+    rs2_i             = 5'd2;
+    ex_mem_mem_read_i = 1'b1;
+    ex_mem_rd_i       = 5'd6;
+    check(1'b0, "EX/MEM load + R-type rd matches rs1 => no stall (not branch/jalr)");
+
+    // 12) EX/MEM load + JALR needs rs1 in ID => stall when rd matches rs1
+    defaults();
+    instr_valid_i     = 1'b1;
+    opcode_i          = OP_JALR;
+    rs1_i             = 5'd13;
+    rs2_i             = 5'd0;
+    ex_mem_mem_read_i = 1'b1;
+    ex_mem_rd_i       = 5'd13;
+    check(1'b1, "EX/MEM load + JALR rd matches rs1 => stall");
+
+    // 13) EX/MEM load + JAL (uses no regs) => no stall
+    defaults();
+    instr_valid_i     = 1'b1;
+    opcode_i          = OP_JAL;
+    rs1_i             = 5'd13;
+    rs2_i             = 5'd13;
+    ex_mem_mem_read_i = 1'b1;
+    ex_mem_rd_i       = 5'd13;
+    check(1'b0, "EX/MEM load + JAL uses no regs => no stall");
+
+    // 14) Both hazards present: ID/EX load-use should stall (regardless of EX/MEM gating)
+    defaults();
+    instr_valid_i     = 1'b1;
+    opcode_i          = OP_BRANCH; // also needs ID operand
     rs1_i             = 5'd3;
     rs2_i             = 5'd4;
     id_ex_mem_read_i  = 1'b1;
     id_ex_rd_i        = 5'd3;      // triggers classic load-use
     ex_mem_mem_read_i = 1'b1;
-    ex_mem_rd_i       = 5'd4;      // would also trigger branch hazard
-    check_case(1'b1, "ID/EX load-use + EX/MEM load + BRANCH => stall");
+    ex_mem_rd_i       = 5'd4;
+    check(1'b1, "ID/EX load-use + EX/MEM load + BRANCH => stall");
 
-    // 11) EX/MEM load + BRANCH hazard via rs2 match => stall
-    apply_defaults();
-    instr_valid_i     = 1'b1;
-    opcode_i          = OP_BRANCH;
-    rs1_i             = 5'd1;
-    rs2_i             = 5'd9;
-    ex_mem_mem_read_i = 1'b1;
-    ex_mem_rd_i       = 5'd9;
-    check_case(1'b1, "EX/MEM load + BRANCH rd matches rs2 => stall");
-
+    // -----------------------------
     // Summary
-    $display("\n--------------------------------------------");
-    $display("Hazard_Unit TB Summary: PASS=%0d FAIL=%0d", pass_count, fail_count);
-    $display("--------------------------------------------\n");
+    // -----------------------------
+    $display("\n====================================================");
+    $display("Hazard_Unit FINAL TB Summary: PASS=%0d  FAIL=%0d", pass_count, fail_count);
+    $display("====================================================\n");
 
-    if (fail_count != 0) $fatal(1, "One or more Hazard_Unit test cases FAILED.");
+    if (fail_count != 0) $fatal(1, "Hazard_Unit testbench: one or more cases FAILED.");
     else                 $finish;
   end
 
