@@ -15,7 +15,7 @@ module Branch_Unit(
     
     // Outputs
     output logic        redirect,
-    output logic [31:0] target_pc,
+    output logic [31:0] target_pc
 );
 
     logic result;
@@ -59,5 +59,6 @@ module Branch_Unit(
 
 
 endmodule
+
 
 
