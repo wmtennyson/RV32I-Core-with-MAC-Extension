@@ -1,16 +1,7 @@
 `include "Def.vh"
 `timescale 1ns/1ps
 
-// -----------------------------------------------------------------------------
-// Decode Unit (ID stage)
-// - Parses instruction fields
-// - Reads regfile (with WB write port)
-// - Generates immediate + control signals
-// - Performs branch/jump decision in ID (with simple forwarding for compare)
-// - Generates stall (load-use / sync-BRAM-friendly 2-deep load hazard)
-// - Registers outputs into ID/EX pipeline regs (inserts bubble on stall/flush)
-// -----------------------------------------------------------------------------
-module decodeunit (
+module Decode_Unit (
     input  logic        clk,
     input  logic        rst,
 
@@ -32,7 +23,7 @@ module decodeunit (
     input  logic [4:0]  id_ex_rs2_i,
     input  logic        id_ex_regwrite_i,
     input  logic        id_ex_mem_read_i,
-    input  logic [31:0] ex_alu_out_i,        // "EX result exists now" (for branch fwd = 11)
+    input  logic [31:0] ex_alu_out_i,
 
     // Instruction currently in MEM stage (EX/MEM regs)
     input  logic [4:0]  ex_mem_rd_i,
@@ -50,40 +41,34 @@ module decodeunit (
     output logic        flush_o,             // branch/jump taken (connect to fetch_unit.flush_i)
     output logic [31:0] branch_target_o,     // connect to fetch_unit.branch_target_i
 
-    // ID/EX pipeline register outputs (to Execute stage and beyond)
-    output logic        id_ex_valid_o,
+    // To ID/EX Reg
+    output logic [31:0] rs1_val_o,
+    output logic [31:0] rs2_val_o,
+    output logic [31:0] imm_o,
 
-    output logic [31:0] id_ex_pc_o,
-    output logic [31:0] id_ex_pc4_o,
-    output logic [31:0] id_ex_rs1_val_o,
-    output logic [31:0] id_ex_rs2_val_o,
-    output logic [31:0] id_ex_imm_o,
+    output logic [4:0]  rs1_o,
+    output logic [4:0]  rs2_o,
+    output logic [4:0]  rd_o,
+    output logic [2:0]  funct3_o,
+    output logic [6:0]  funct7_o,
 
-    output logic [4:0]  id_ex_rs1_o,
-    output logic [4:0]  id_ex_rs2_o,
-    output logic [4:0]  id_ex_rd_o,
-    output logic [2:0]  id_ex_funct3_o,
-    output logic [6:0]  id_ex_funct7_o,
+    output logic        regwrite_o,
+    output logic        mem_read_o,
+    output logic        mem_write_o,
+    output logic        branch_o,
+    output logic        jump_o,
+    output logic        write_data_o,
+    output logic        lui_o,
+    output logic        is_jalr_o,
+    output logic [2:0]  alu_op_o,
 
-    // Control to later stages
-    output logic        id_ex_regwrite_o,
-    output logic        id_ex_mem_read_o,
-    output logic        id_ex_mem_write_o,
-    output logic        id_ex_branch_o,
-    output logic        id_ex_jump_o,
-    output logic        id_ex_write_data_o,  // Mem->WB select (from your Control_Unit)
-    output logic        id_ex_lui_o,
-    output logic        id_ex_is_jalr_o,
-    output logic [2:0]  id_ex_alu_op_o,
-
-    // Execute operand selects / forwarding selects
-    output logic [1:0]  id_ex_opA_sel_o,     // 00=PC, 01=PC4, 10=RS1 (matches your Execute_Unit)
-    output logic        id_ex_opB_sel_o,     // 0=RS2, 1=IMM
-    output logic [1:0]  id_ex_rs1_sel_o,     // to Execute_Unit
-    output logic [1:0]  id_ex_rs2_sel_o      // to Execute_Unit
+    output logic        opA_sel_o,
+    output logic        opB_sel_o,
+    output logic [1:0]  rs1_sel_o,
+    output logic [1:0]  rs2_sel_o
 );
 
-    // RISC-V NOP: addi x0, x0, 0
+    // RISC-V NOP: addi x0, x0, 0 (currently unused)
     localparam logic [31:0] NOP_INSTR = 32'h0000_0013;
 
     // -------------------------
@@ -106,7 +91,7 @@ module decodeunit (
     // -------------------------
     logic [31:0] rs1_rf, rs2_rf;
 
-    RegFile32 RF (
+    regfile RF (
         .clk      (clk),
         .rst      (rst),
         .we_i     (wb_we_i),
@@ -137,7 +122,7 @@ module decodeunit (
                  branch_d,
                  jump_d,
                  write_data_d,
-                 opA_sel_bit_d,
+                 opA_sel_d,
                  opB_sel_d,
                  lui_d,
                  is_jalr_d;
@@ -151,7 +136,7 @@ module decodeunit (
         .branch     (branch_d),
         .jump       (jump_d),
         .write_data (write_data_d),
-        .OpA_sel    (opA_sel_bit_d),
+        .OpA_sel    (opA_sel_d),
         .OpB_sel    (opB_sel_d),
         .lui        (lui_d),
         .is_jalr    (is_jalr_d),
@@ -165,6 +150,8 @@ module decodeunit (
                  branch_g,
                  jump_g,
                  write_data_g,
+                 opA_sel_g,
+                 opB_sel_g,
                  lui_g,
                  is_jalr_g;
     logic [2:0]  alu_op_g;
@@ -177,6 +164,8 @@ module decodeunit (
             branch_g     = 1'b0;
             jump_g       = 1'b0;
             write_data_g = 1'b0;
+            opA_sel_g    = 1'b0;
+            opB_sel_g    = 1'b0;
             lui_g        = 1'b0;
             is_jalr_g    = 1'b0;
             alu_op_g     = `NOP;
@@ -187,11 +176,32 @@ module decodeunit (
             branch_g     = branch_d;
             jump_g       = jump_d;
             write_data_g = write_data_d;
+            opA_sel_g    = opA_sel_d;
+            opB_sel_g    = opB_sel_d;
             lui_g        = lui_d;
             is_jalr_g    = is_jalr_d;
             alu_op_g     = alu_op_d;
         end
     end
+
+    // -------------------------
+    // Hazard detection -> stall 
+    // -------------------------
+    logic stall_hazard;
+
+    Hazard_Unit HU (
+        .instr_valid_i    (instr_valid_i),
+        .opcode_i         (opcode),
+        .rs1_i            (rs1),
+        .rs2_i            (rs2),
+        .id_ex_mem_read_i (id_ex_mem_read_i),
+        .id_ex_rd_i       (id_ex_rd_i),
+        .ex_mem_mem_read_i(ex_mem_mem_read_i),
+        .ex_mem_rd_i      (ex_mem_rd_i),
+        .stall_o          (stall_hazard)
+    );
+
+    assign stall_o = stall_hazard;
 
     // -------------------------
     // Forwarding for branch compare (ID-stage)
@@ -224,7 +234,6 @@ module decodeunit (
     logic [31:0] br_rs1_val, br_rs2_val;
 
     always_comb begin
-        // defaults = regfile
         br_rs1_val = rs1_rf;
         br_rs2_val = rs2_rf;
 
@@ -250,7 +259,13 @@ module decodeunit (
     // -------------------------
     logic        redirect_d;
     logic [31:0] target_pc_d;
-    logic [31:0] link_pc_d;
+    logic [31:0] link_pc_d; // currently unused in this module
+
+    // FIX: do not allow redirect decisions while stalled
+    logic branch_eff, jump_eff, jalr_eff;
+    assign branch_eff = branch_g   & ~stall_o;
+    assign jump_eff   = jump_g     & ~stall_o;
+    assign jalr_eff   = is_jalr_g  & ~stall_o;
 
     Branch_Unit BU (
         .pc            (pc_i),
@@ -258,142 +273,80 @@ module decodeunit (
         .rs1           (br_rs1_val),
         .rs2           (br_rs2_val),
         .imm           (imm_d),
-        .branch        (branch_g),
-        .jump          (jump_g),
-        .pcsrc         (is_jalr_g),
+        .branch        (branch_eff),
+        .jump          (jump_eff),
+        .pcsrc         (jalr_eff),
         .funct3        (funct3),
         .redirect      (redirect_d),
         .target_pc     (target_pc_d),
         .link_register (link_pc_d)
     );
 
-    assign flush_o         = redirect_d;     // taken branch or any jump
+    // FIX: suppress flush while stalled
+    assign flush_o         = redirect_d & ~stall_o;
     assign branch_target_o = target_pc_d;
 
     // -------------------------
-    // Hazard detection -> stall
-    // (Designed to be safe with sync BRAM loads: stalls on load in EX and EX/MEM)
+    // Drive outputs to downstream stage
+    // Bubble on invalid / redirect / stall / reset
     // -------------------------
-    logic uses_rs1, uses_rs2;
+    logic bubble;
+    assign bubble = rst | !instr_valid_i | flush_o | stall_o;
 
     always_comb begin
-        uses_rs1 = 1'b0;
-        uses_rs2 = 1'b0;
+        // defaults = bubble
+        rs1_val_o    = 32'd0;
+        rs2_val_o    = 32'd0;
+        imm_o        = 32'd0;
 
-        if (instr_valid_i) begin
-            unique case (opcode)
-                7'b0110111: begin uses_rs1 = 1'b0; uses_rs2 = 1'b0; end // LUI
-                7'b0010111: begin uses_rs1 = 1'b0; uses_rs2 = 1'b0; end // AUIPC
-                7'b1101111: begin uses_rs1 = 1'b0; uses_rs2 = 1'b0; end // JAL
-                7'b1100111: begin uses_rs1 = 1'b1; uses_rs2 = 1'b0; end // JALR
-                7'b1100011: begin uses_rs1 = 1'b1; uses_rs2 = 1'b1; end // BRANCH
-                7'b0100011: begin uses_rs1 = 1'b1; uses_rs2 = 1'b1; end // STORE
-                7'b0000011: begin uses_rs1 = 1'b1; uses_rs2 = 1'b0; end // LOAD
-                7'b0010011: begin uses_rs1 = 1'b1; uses_rs2 = 1'b0; end // I-type ALU
-                7'b0110011: begin uses_rs1 = 1'b1; uses_rs2 = 1'b1; end // R-type ALU
-                default:    begin uses_rs1 = 1'b0; uses_rs2 = 1'b0; end
-            endcase
+        rs1_o        = 5'd0;
+        rs2_o        = 5'd0;
+        rd_o         = 5'd0;
+        funct3_o     = 3'd0;
+        funct7_o     = 7'd0;
+
+        regwrite_o   = 1'b0;
+        mem_read_o   = 1'b0;
+        mem_write_o  = 1'b0;
+        branch_o     = 1'b0;
+        jump_o       = 1'b0;
+        write_data_o = 1'b0;
+        lui_o        = 1'b0;
+        is_jalr_o    = 1'b0;
+        alu_op_o     = `NOP;
+
+        opA_sel_o    = 1'b0;
+        opB_sel_o    = 1'b0;
+        rs1_sel_o    = 2'b00;
+        rs2_sel_o    = 2'b00;
+
+        if (!bubble) begin
+            rs1_val_o    = rs1_rf;
+            rs2_val_o    = rs2_rf;
+            imm_o        = imm_d;
+
+            rs1_o        = rs1;
+            rs2_o        = rs2;
+            rd_o         = rd;
+            funct3_o     = funct3;
+            funct7_o     = funct7;
+
+            // Safer to use gated controls
+            regwrite_o   = regwrite_g;
+            mem_read_o   = mem_read_g;
+            mem_write_o  = mem_write_g;
+            branch_o     = branch_g;
+            jump_o       = jump_g;
+            write_data_o = write_data_g;
+            lui_o        = lui_g;
+            is_jalr_o    = is_jalr_g;
+            alu_op_o     = alu_op_g;
+
+            opA_sel_o    = opA_sel_g;
+            opB_sel_o    = opB_sel_g;
+            rs1_sel_o    = RS1_Sel_d;
+            rs2_sel_o    = RS2_Sel_d;
         end
     end
-
-    logic hazard_ex_load, hazard_mem_load;
-
-    always_comb begin
-        hazard_ex_load  = 1'b0;
-        hazard_mem_load = 1'b0;
-
-        // If instruction in EX is a load and we need its rd now -> stall
-        if (id_ex_mem_read_i && (id_ex_rd_i != 5'd0) && instr_valid_i) begin
-            if ((uses_rs1 && (id_ex_rd_i == rs1)) ||
-                (uses_rs2 && (id_ex_rd_i == rs2))) begin
-                hazard_ex_load = 1'b1;
-            end
-        end
-
-        // If instruction in EX/MEM is a load and we need its rd now -> stall
-        // (Needed if you can only forward load results at MEM/WB due to sync BRAM timing)
-        if (ex_mem_mem_read_i && (ex_mem_rd_i != 5'd0) && instr_valid_i) begin
-            if ((uses_rs1 && (ex_mem_rd_i == rs1)) ||
-                (uses_rs2 && (ex_mem_rd_i == rs2))) begin
-                hazard_mem_load = 1'b1;
-            end
-        end
-    end
-
-    // Flush has priority over stall (if you redirect, don't also "stall")
-    always_comb begin
-        if (flush_o) stall_o = 1'b0;
-        else         stall_o = hazard_ex_load | hazard_mem_load;
-    end
-
-    // ID/EX pipeline register moved to its own module
-    id_ex_pipe_reg ID_EX_REG (
-        .clk            (clk),
-        .rst            (rst),
-
-        .flush_i        (flush_o),
-        .stall_i        (stall_o),
-        .instr_valid_i  (instr_valid_i),
-
-        // data
-        .pc_i           (pc_i),
-        .pc4_i          (pc4_i),
-        .rs1_val_i      (rs1_rf),
-        .rs2_val_i      (rs2_rf),
-        .imm_i          (imm_d),
-
-        .rs1_i          (rs1),
-        .rs2_i          (rs2),
-        .rd_i           (rd),
-        .funct3_i       (funct3),
-        .funct7_i       (funct7),
-
-        // control (use your gated versions if you have them)
-        .regwrite_i     (regwrite_g),
-        .mem_read_i     (mem_read_g),
-        .mem_write_i    (mem_write_g),
-        .branch_i       (branch_g),
-        .jump_i         (jump_g),
-        .write_data_i   (write_data_g),
-        .lui_i          (lui_g),
-        .is_jalr_i      (is_jalr_g),
-        .alu_op_i       (alu_op_g),
-
-        // execute selects
-        .opA_sel_bit_i  (opA_sel_bit_d),
-        .opB_sel_i      (opB_sel_d),
-        .rs1_sel_i      (RS1_Sel_d),
-        .rs2_sel_i      (RS2_Sel_d),
-
-        // outputs (these are decode_unit outputs)
-        .id_ex_valid_o      (id_ex_valid_o),
-
-        .id_ex_pc_o         (id_ex_pc_o),
-        .id_ex_pc4_o        (id_ex_pc4_o),
-        .id_ex_rs1_val_o    (id_ex_rs1_val_o),
-        .id_ex_rs2_val_o    (id_ex_rs2_val_o),
-        .id_ex_imm_o        (id_ex_imm_o),
-
-        .id_ex_rs1_o        (id_ex_rs1_o),
-        .id_ex_rs2_o        (id_ex_rs2_o),
-        .id_ex_rd_o         (id_ex_rd_o),
-        .id_ex_funct3_o     (id_ex_funct3_o),
-        .id_ex_funct7_o     (id_ex_funct7_o),
-
-        .id_ex_regwrite_o   (id_ex_regwrite_o),
-        .id_ex_mem_read_o   (id_ex_mem_read_o),
-        .id_ex_mem_write_o  (id_ex_mem_write_o),
-        .id_ex_branch_o     (id_ex_branch_o),
-        .id_ex_jump_o       (id_ex_jump_o),
-        .id_ex_write_data_o (id_ex_write_data_o),
-        .id_ex_lui_o        (id_ex_lui_o),
-        .id_ex_is_jalr_o    (id_ex_is_jalr_o),
-        .id_ex_alu_op_o     (id_ex_alu_op_o),
-
-        .id_ex_opA_sel_o    (id_ex_opA_sel_o),
-        .id_ex_opB_sel_o    (id_ex_opB_sel_o),
-        .id_ex_rs1_sel_o    (id_ex_rs1_sel_o),
-        .id_ex_rs2_sel_o    (id_ex_rs2_sel_o)
-    );
 
 endmodule
