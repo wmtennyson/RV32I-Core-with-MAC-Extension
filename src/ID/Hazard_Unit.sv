@@ -1,100 +1,82 @@
-`timescale 1ns / 1ps
-`include "Def.vh"
+`timescale 1ns/1ps
 
-module Hazard_Unit(
-    // Inputs - Signals from ID Stage
-    input  logic        ID_regwrite,
-                        ID_mem_read,
-                        ID_mem_write,
-                        ID_branch,
-                        ID_jump,
-                        ID_write_data,
-                        ID_is_jalr,
-    input  logic [2:0]  ID_alu_op,
-    
-    // Inputs - Register Addresses from various stages
-    input logic [4:0]   IF_ID_rs1, 
-                        IF_ID_rs2, 
-                        ID_EX_rd,
-                        EX_MEM_rd,
-                        
-    // Inputs - MemRead signals from interstage registers                    
-    input logic         ID_EX_mem_read,
-                        EX_MEM_mem_read_i,
-                
-   // Inputs - Inputs from Branch Unit
-   input logic          redirect_taken,
-   input logic [31:0]   redirect_target,             
-                
-    // Outputs - Signals sent to the fetch unit
-   output logic         fetch_stall,
-                        fetch_flush,
-                        ID_EX_flush,
-   output logic [31:0]  target,
-  
-                                 
-    //Outputs - Control Signals to Interstage Register
-    output logic        ID_EX_regwrite,
-                        ID_EX_mem_read_o,
-                        ID_EX_mem_write,
-                        ID_EX_branch,
-                        ID_EX_jump,
-                        ID_EX_write_data,
-    output logic [2:0]  ID_EX_alu_op
+module Hazard_Unit (
 
-    );
-    
-    // Variables
-    logic load_use_hazard,
-          load_branch_hazard;
-    
+    // Inputs - Current instruction in IF/ID (Decode stage)
+    input  logic        instr_valid_i,
+    input  logic [6:0]  opcode_i,
+    input  logic [4:0]  rs1_i,
+                        rs2_i,
+
+    // Inputs - Instruction currently in EX stage (ID/EX regs)
+    input  logic        id_ex_mem_read_i,
+    input  logic [4:0]  id_ex_rd_i,
+
+    // Inputs - Instruction currently in MEM stage (EX/MEM regs)
+    input  logic        ex_mem_mem_read_i,
+    input  logic [4:0]  ex_mem_rd_i,
+
+    // Output -  stall request (freeze PC + IF/ID)
+    output logic        stall_o
+);
+
+    // Decode which source regs are *actually used* by current opcode
+    // (prevents false stalls on I-type where instr[24:20] is imm[4:0], not rs2)
+    logic uses_rs1, uses_rs2;
+
     always_comb begin
-    
-        // Set Defaults - Set Default Outputs
-        fetch_stall = 1'b0;
-        fetch_flush = 1'b0;
-        target      = redirect_target;
-        ID_EX_flush = 1'b0;
-    
-        // Set Defaults - Push ID stage control signals to ID/EX register
-        ID_EX_regwrite   = ID_regwrite;
-        ID_EX_mem_read_o = ID_mem_read; 
-        ID_EX_mem_write  = ID_mem_write;
-        ID_EX_branch     = ID_branch; 
-        ID_EX_jump       = ID_jump; 
-        ID_EX_write_data = ID_write_data; 
-        ID_EX_alu_op     = ID_alu_op;
-         
-        // Check for Load-use Hazard
-        load_use_hazard = ID_EX_mem_read && (ID_EX_rd != 5'd0) && ((ID_EX_rd == IF_ID_rs1) || (ID_EX_rd == IF_ID_rs2)); 
-            
-        // Check for Load-Branch Hazard 
-       load_branch_hazard = (ID_branch || ID_is_jalr) && ((ID_EX_mem_read && (ID_EX_rd != 5'd0) && ((ID_EX_rd == IF_ID_rs1) || (ID_EX_rd == IF_ID_rs2))) || (EX_MEM_mem_read_i && (EX_MEM_rd != 5'd0) && ((EX_MEM_rd == IF_ID_rs1) || (EX_MEM_rd == IF_ID_rs2))));
+        uses_rs1 = 1'b0;
+        uses_rs2 = 1'b0;
 
-        // Hazard Unit Logic - If either hazard is high, then stall
-        if (load_use_hazard || load_branch_hazard) begin
-            
-            // Send Stall signal back to IF stage
-            fetch_stall = 1'b1;
-            ID_EX_flush = 1'b1;            
-            
-            // Overide EX stage signals to NOOP
-            ID_EX_regwrite   = 1'b0;
-            ID_EX_mem_read_o = 1'b0; 
-            ID_EX_mem_write  = 1'b0;
-            ID_EX_branch     = 1'b0; 
-            ID_EX_jump       = 1'b0; 
-            ID_EX_write_data = 1'b0; 
-            ID_EX_alu_op     = `NOP;      
-             
+        if (instr_valid_i) begin
+            unique case (opcode_i)
+                7'b0110111: begin uses_rs1 = 1'b0; uses_rs2 = 1'b0; end // LUI
+                7'b0010111: begin uses_rs1 = 1'b0; uses_rs2 = 1'b0; end // AUIPC
+                7'b1101111: begin uses_rs1 = 1'b0; uses_rs2 = 1'b0; end // JAL
+                7'b1100111: begin uses_rs1 = 1'b1; uses_rs2 = 1'b0; end // JALR
+                7'b1100011: begin uses_rs1 = 1'b1; uses_rs2 = 1'b1; end // BRANCH
+                7'b0100011: begin uses_rs1 = 1'b1; uses_rs2 = 1'b1; end // STORE
+                7'b0000011: begin uses_rs1 = 1'b1; uses_rs2 = 1'b0; end // LOAD (base in rs1)
+                7'b0010011: begin uses_rs1 = 1'b1; uses_rs2 = 1'b0; end // I-type ALU
+                7'b0110011: begin uses_rs1 = 1'b1; uses_rs2 = 1'b1; end // R-type ALU
+                default:    begin uses_rs1 = 1'b0; uses_rs2 = 1'b0; end
+            endcase
         end
-        // Hazard Unit Logic - If a Branch is taken then flush the pipeline
-        else if(redirect_taken) begin
-        
-            fetch_flush = 1'b1;
-        
-        end
-            
     end
-    
+
+    // Identify ops that need operand *in ID* (branch compare / JALR base)
+    // Only these require stalling on an EX/MEM load.
+    logic is_branch, is_jalr, needs_id_operand;
+
+    always_comb begin
+        is_branch        = (opcode_i == 7'b1100011);
+        is_jalr          = (opcode_i == 7'b1100111);
+        needs_id_operand = instr_valid_i && (is_branch || is_jalr);
+    end
+
+    // Hazard detection
+    logic hazard_ex_load;   // classic load-use (ID/EX is load)
+    logic hazard_mem_load;  // only for branch/jalr needing operand in ID (EX/MEM is load)
+
+    always_comb begin
+        hazard_ex_load  = 1'b0;
+        hazard_mem_load = 1'b0;
+
+        // Load-Use Hazard -  producer is a load in ID/EX.
+        if (instr_valid_i && id_ex_mem_read_i && (id_ex_rd_i != 5'd0)) begin
+            if ((uses_rs1 && (id_ex_rd_i == rs1_i)) || (uses_rs2 && (id_ex_rd_i == rs2_i))) begin
+                hazard_ex_load = 1'b1;
+            end
+        end
+
+        // EX/MEM load hazard - only stall when current instruction needs the value in ID
+        if (needs_id_operand && ex_mem_mem_read_i && (ex_mem_rd_i != 5'd0)) begin
+            if ((uses_rs1 && (ex_mem_rd_i == rs1_i)) || (uses_rs2 && (ex_mem_rd_i == rs2_i))) begin
+                hazard_mem_load = 1'b1;
+            end
+        end
+    end
+
+    assign stall_o = hazard_ex_load | hazard_mem_load;
+
 endmodule
