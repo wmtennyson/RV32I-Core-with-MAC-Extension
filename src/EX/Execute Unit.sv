@@ -22,8 +22,8 @@ module Execute_Unit(
     // Control Signals for Muxltiplexers
     input logic [1:0] RS1_sel,
                       RS2_sel,
-                      OpA_sel,
-    input logic       OpB_sel,
+    input logic       OpA_sel,
+                      OpB_sel,
     
     // Execute Unit Output
     output logic [31:0] alu_out
