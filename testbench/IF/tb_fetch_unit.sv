@@ -1,26 +1,29 @@
 `timescale 1ns / 1ps
 
-module tb_fetch_unit;
+module tb_fetch_unit();
 
-    // 1. Signals
+    // System signals
     logic        clk;
     logic        rst;
+
+    // Inputs to fetch_unit
     logic        stall_i;
     logic        flush_i;
     logic [31:0] branch_target_i;
-    
-    // Outputs from DUT
+
+    // Outputs from fetch_unit
     logic [31:0] bram_addr_o;
     logic        bram_en_o;
-    logic [31:0] bram_rdata_i;
-    
-    logic        instr_valid_o;
-    logic [31:0] instr_o;
-    logic [31:0] pc_o;
-    logic [31:0] pc_plus4_o;
+    logic [31:0] if_pc_o;
+    logic [31:0] if_pc_plus4_o;
 
-    // 2. Instantiate the DUT (Device Under Test)
-    fetch_unit DUT (
+    // Error counter for self-verification
+    int error_count = 0;
+
+    // Instantiate the Unit Under Test (UUT)
+    fetch_unit #(
+        .RESET_VECTOR(32'h0000_0000)
+    ) uut (
         .clk(clk),
         .rst(rst),
         .stall_i(stall_i),
@@ -28,90 +31,78 @@ module tb_fetch_unit;
         .branch_target_i(branch_target_i),
         .bram_addr_o(bram_addr_o),
         .bram_en_o(bram_en_o),
-        .bram_rdata_i(bram_rdata_i),
-        .instr_valid_o(instr_valid_o),
-        .instr_o(instr_o),
-        .pc_o(pc_o),
-        .pc_plus4_o(pc_plus4_o)
+        .if_pc_o(if_pc_o),
+        .if_pc_plus4_o(if_pc_plus4_o)
     );
 
-    // 3. Clock Generation (100MHz = 10ns period)
+    // Clock Generation (100MHz)
     always #5 clk = ~clk;
 
-    // 4. Mimic BRAM Behavior (Fake Memory)
-    // We create a small array to act as memory for testing
-    logic [31:0] test_mem [0:255]; 
-
-    always_ff @(posedge clk) begin
-        if (bram_en_o) begin
-            // Simulates 1-cycle read latency
-            // Use [9:2] to handle word alignment and keep array small
-            bram_rdata_i <= test_mem[bram_addr_o[9:2]];
+    // Helper task to check outputs
+    task check_outputs(input logic [31:0] exp_pc, input string test_name);
+        #1; // Wait a tiny bit for combinational logic to settle
+        if (if_pc_o !== exp_pc || bram_addr_o !== exp_pc || if_pc_plus4_o !== (exp_pc + 4) || bram_en_o !== 1'b1) begin
+            $error("[%s] FAILED. Expected PC: %0h | Got PC: %0h, BRAM Addr: %0h, PC+4: %0h, BRAM EN: %b", 
+                   test_name, exp_pc, if_pc_o, bram_addr_o, if_pc_plus4_o, bram_en_o);
+            error_count++;
+        end else begin
+            $display("[%s] PASSED. PC = %0h", test_name, if_pc_o);
         end
-    end
+    endtask
 
-    // 5. Test Procedure
+    // Main Test Sequence
     initial begin
-        // Initialize Signals
+        $display("==================================================");
+        $display("Starting self-verifying testbench for fetch_unit");
+        $display("==================================================");
+
+        // Initialization
         clk = 0;
         rst = 1;
         stall_i = 0;
         flush_i = 0;
-        branch_target_i = 0;
+        branch_target_i = 32'h0000_0000;
 
-        // Fill "Memory" with recognizable patterns
-        // PC 0x00 -> 0xAAAA_0000
-        // PC 0x04 -> 0xAAAA_0004
-        // ...
-        for (int i = 0; i < 256; i++) begin
-            test_mem[i] = 32'hAAAA_0000 + (i * 4); 
-        end
+        // Test 1: Reset behavior
+        @(negedge clk);
+        check_outputs(32'h0000_0000, "Reset State");
 
-        // --- RESET SEQUENCE ---
-        $display("Applying Reset...");
-        #20;
+        // Test 2: Normal Execution (PC increments by 4)
         rst = 0;
-        #10; // Wait for valid data to flow through pipe
+        @(negedge clk); check_outputs(32'h0000_0004, "Normal Exec Cycle 1");
+        @(negedge clk); check_outputs(32'h0000_0008, "Normal Exec Cycle 2");
+        @(negedge clk); check_outputs(32'h0000_000C, "Normal Exec Cycle 3");
 
-        // --- TEST 1: Normal Execution ---
-        $display("Test 1: Normal Execution");
-        // We expect PC to increment: 0, 4, 8, 12...
-        // We expect Instr to match: AAAA0000, AAAA0004...
-        #50; 
+        // Test 3: Stall (PC should freeze at 0x0000_000c)
+        stall_i = 1;
+        @(negedge clk); check_outputs(32'h0000_000C, "Stall Cycle 1");
+        @(negedge clk); check_outputs(32'h0000_000C, "Stall Cycle 2");
+        @(negedge clk); check_outputs(32'h0000_000C, "Stall Cycle 3");
 
-        // --- TEST 2: Stall Injection ---
-        $display("Test 2: Assert Stall");
-        // At this point, let's say PC is at 0x14.
-        // We assert stall. 
-        // 1. The PC should freeze.
-        // 2. The memory will return data for 0x18 (requested previous cycle).
-        // 3. The SKID BUFFER should catch 0x18.
-        @(posedge clk);
-        stall_i = 1; 
-        
-        #30; // Hold stall for 3 clocks. output should remain constant.
-        
-        $display("Test 2: Release Stall");
-        @(posedge clk); 
-        stall_i = 0; // Release. The output should immediately be the skid data (0x18)
-        
-        #20; // Resume normal
+        // Test 4: Resume from Stall
+        stall_i = 0;
+        @(negedge clk); check_outputs(32'h0000_0010, "Resume Exec Cycle 1");
+        @(negedge clk); check_outputs(32'h0000_0014, "Resume Exec Cycle 2");
 
-        // --- TEST 3: Flush (Branch) ---
-        $display("Test 3: Flush / Branch");
-        @(posedge clk);
+        // Test 5: Flush (Branch taken)
         flush_i = 1;
-        branch_target_i = 32'h0000_0040; // Jump to 0x40
-        
-        @(posedge clk);
-        flush_i = 0;
-        
-        // Output should be NOP during flush
-        // Then PC should jump to 0x40, and data AAAA0040 should appear a cycle later
-        #50;
+        branch_target_i = 32'h0000_0100;
+        // The PC updates to branch target on the *next* clock edge
+        @(negedge clk); check_outputs(32'h0000_0100, "Flush/Branch Taken");
 
-        $display("Test Complete");
+        // Test 6: Normal Execution after Branch
+        flush_i = 0;
+        @(negedge clk); check_outputs(32'h0000_0104, "Post-Branch Exec Cycle 1");
+        @(negedge clk); check_outputs(32'h0000_0108, "Post-Branch Exec Cycle 2");
+
+        // Final Report
+        $display("==================================================");
+        if (error_count == 0) begin
+            $display("SUCCESS: All fetch_unit tests passed!");
+        end else begin
+            $display("FAILED: %0d tests failed in fetch_unit.", error_count);
+        end
+        $display("==================================================");
         $finish;
     end
-
 endmodule
