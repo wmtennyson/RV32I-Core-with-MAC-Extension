@@ -1,6 +1,5 @@
 `timescale 1ns / 1ps
 
-// UNFINISHED
 module RV32I_Core(
   input  logic        clk,
   input  logic        rst,
@@ -230,6 +229,36 @@ module RV32I_Core(
     
     
     // ---------------------- ID/EX Interstage Register ----------------------
+    // ID/EX registered outputs
+    logic        ex_valid_i;
+
+    logic [31:0] ex_pc_i,
+                 ex_pc4_i,
+                 ex_rs1_val_i,
+                 ex_rs2_val_i,
+                 ex_imm_i;
+
+    logic [4:0]  ex_rs1_i,
+                 ex_rs2_i,
+                 ex_rd_i;
+    logic [2:0]  ex_funct3_i;
+    logic [6:0]  ex_funct7_i;
+
+    logic        ex_regwrite_i,
+                 ex_mem_read_i,
+                 ex_mem_write_i,
+                 ex_branch_i,
+                 ex_jump_i,
+                 ex_write_data_i,
+                 ex_lui_i,
+                 ex_is_jalr_i;
+    logic [2:0]  ex_alu_op_i;
+
+    logic [1:0]  ex_opA_sel_i;  
+    logic        ex_opB_sel_i;
+    logic [1:0]  ex_rs1_sel_i,
+                 ex_rs2_sel_i;
+    
     id_ex_reg ID_EX_REG (
         .clk                (clk),
         .rst                (rst),
@@ -237,40 +266,40 @@ module RV32I_Core(
         // Inputs
         .flush_i            (flush_o),
         .stall_i            (stall_o),
-        .instr_valid_i      (instr_valid_i),
+        .instr_valid_i      (id_ex_instr_valid_o),
 
         // data
-        .pc_i               (pc_i),
-        .pc4_i              (pc4_i),
-        .rs1_val_i          (rs1_rf),
-        .rs2_val_i          (rs2_rf),
-        .imm_i              (imm_d),
+        .pc_i               (id_ex_pc_o),
+        .pc4_i              (id_ex_pc4_o),
+        .rs1_val_i          (id_ex_rs1_val_o),
+        .rs2_val_i          (id_ex_rs2_val_o),
+        .imm_i              (id_ex_imm_o),
 
-        .rs1_i              (rs1),
-        .rs2_i              (rs2),
-        .rd_i               (rd),
-        .funct3_i           (funct3),
-        .funct7_i           (funct7),
+        .rs1_i              (id_ex_rs1_o),
+        .rs2_i              (id_ex_rs2_o),
+        .rd_i               (id_ex_rd_o),
+        .funct3_i           (id_ex_funct3_o),
+        .funct7_i           (id_ex_funct7_o),
 
         // control (use your gated versions if you have them)
-        .regwrite_i         (regwrite_g),
-        .mem_read_i         (mem_read_g),
-        .mem_write_i        (mem_write_g),
-        .branch_i           (branch_g),
-        .jump_i             (jump_g),
-        .write_data_i       (write_data_g),
-        .lui_i              (lui_g),
-        .is_jalr_i          (is_jalr_g),
-        .alu_op_i           (alu_op_g),
+        .regwrite_i         (id_ex_regwrite_o),
+        .mem_read_i         (id_ex_mem_read_o),
+        .mem_write_i        (id_ex_mem_write_o),
+        .branch_i           (id_ex_branch_o),
+        .jump_i             (id_ex_jump_o),
+        .write_data_i       (id_ex_write_data_o),
+        .lui_i              (id_ex_lui_o),
+        .is_jalr_i          (id_ex_is_jalr_o),
+        .alu_op_i           (id_ex_alu_op_o),
 
         // execute selects
-        .opA_sel_bit_i      (opA_sel_bit_d),
-        .opB_sel_i          (opB_sel_d),
-        .rs1_sel_i          (RS1_Sel_d),
-        .rs2_sel_i          (RS2_Sel_d),
+        .opA_sel_i          (id_ex_opA_sel_o),
+        .opB_sel_i          (id_ex_opB_sel_o),
+        .rs1_sel_i          (id_ex_rs1_sel_o),
+        .rs2_sel_i          (id_ex_rs2_sel_o),
 
         // Outputs (these are decode_unit outputs)
-        .id_ex_valid_o      (id_ex_valid_o),
+        .id_ex_valid_o      (ex_valid_i),
 
         .id_ex_pc_o         (id_ex_pc_o),
         .id_ex_pc4_o        (id_ex_pc4_o),
