@@ -40,7 +40,7 @@ module id_ex_reg (
     input  logic [2:0]  alu_op_i,
 
     // Execute select inputs
-    input  logic        opA_sel_bit_i,     
+    input  logic        opA_sel_i,     
     input  logic        opB_sel_i,         
     input  logic [1:0]  rs1_sel_i,         
     input  logic [1:0]  rs2_sel_i,
@@ -81,7 +81,7 @@ module id_ex_reg (
 
     always_comb begin
         opA_sel_d = 2'b10;            
-        if (opA_sel_bit_i) opA_sel_d = 2'b00; 
+        if (opA_sel_i) opA_sel_d = 2'b00; 
 
     end
 
