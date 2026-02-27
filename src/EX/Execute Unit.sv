@@ -66,9 +66,8 @@ module Execute_Unit(
         // Second-Layer Operand Multiplexers - Input from Multiplexer for OpA and OpB
         // Select the Input for OpA_Sel Mux
         unique case(OpA_sel)
-            2'b00 : OpA = PC;
-            2'b01 : OpA = PC4;
-            2'b10 : OpA = RS1;
+            1'b0 : OpA = PC;
+            1'b1 : OpA = RS1;
             default : ;
         endcase
         
