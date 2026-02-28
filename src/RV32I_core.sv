@@ -1,6 +1,5 @@
 `timescale 1ns / 1ps
-
-// Todo: Install Stall Logic for the other regs. Currecntly Decode should only shoot stall to fetch unit
+// UNFINISHED
 
 module RV32I_Core(
   input  logic        clk,
@@ -466,62 +465,83 @@ module RV32I_Core(
 
     
     // ---------------------- MEM/WB Interstage Register ----------------------
+    // Outputs to WB stage
+    logic             wb_valid_i;
+    logic [4:0]       wb_rd_i;
+    logic             wb_regwrite_i,
+                      wb_write_data_i;
+    logic [31:0]      wb_alu_out_i;
+    logic             wb_load_valid_i;
+    logic [31:0]      wb_load_data_i;
+    
     mem_wb_reg MEM_WB_REG(
-        .clk                (clk),
-        .rst                (rst),
+        .clk                   (clk),
+        .rst                   (rst),
         
         // Inputs
-        .flush_i            (1'b0),    // optional (set 0 if unused)
-        .stall_i,           (1'b0),    // optional (set 0 if unused)
+        .flush_i               (1'b0),    // optional (set 0 if unused)
+        .stall_i               (1'b0),    // optional (set 0 if unused)
     
         // Inputs from EX/MEM (control + rd + calc/alu result)
-        .ex_mem_valid_i     (mem_valid_i),
-        .ex_mem_rd_i        (,   
-        .ex_mem_regwrite_i,
-        .ex_mem_write_data_i, // 1=mem->wb, 0=alu->wb
-        .ex_mem_alu_out_i,
+        .ex_mem_valid_i         (mem_valid_i),
+        .ex_mem_rd_i            (mem_rd_i),   
+        .ex_mem_regwrite_i      (mem_regwrite_i),
+        .ex_mem_write_data_i    (mem_write_data_i), // 1=mem->wb, 0=alu->wb
+        .ex_mem_alu_out_i       (mem_alu_out_i),
     
         // Inputs from mem_unit (formatted load result)
-        .mem_load_valid_i,
-        .mem_load_data_i,
+        .mem_load_valid_i       (mem_load_valid),
+        .mem_load_data_i        (mem_load_data),
     
         // Outputs to WB stage
-        .mem_wb_valid_o,
-        .mem_wb_rd_o,
-        .mem_wb_regwrite_o,
-        .mem_wb_write_data_o,
-        .mem_wb_alu_out_o,
-        .mem_wb_load_valid_o,
-        .mem_wb_load_data_o
+        .mem_wb_valid_o         (wb_valid_i),
+        .mem_wb_rd_o            (wb_rd_i),
+        .mem_wb_regwrite_o      (wb_regwrite_i), 
+        .mem_wb_write_data_o    (wb_write_data_i),
+        .mem_wb_alu_out_o       (wb_alu_out_i),
+        .mem_wb_load_valid_o    (wb_load_valid_i),
+        .mem_wb_load_data_o     (wb_load_data_i)
     );
     
     
     
     // ---------------------- Writeback Stage ----------------------
+    // register file write port
+    logic        rf_we;
+    logic [4:0]  rf_waddr;
+    logic [31:0] rf_wdata;
+
+    // writeback stage outputs (forwarding / debug visibility)
+    logic        wb_valid,
+                 wb_regwrite_eff;     // regwrite after gating
+    logic [4:0]  wb_rd;
+    logic [31:0] wb_value;
+    
     writeback_unit WbU (
         //Inputs
         // from mem/wb pipeline register
-        .mem_wb_valid,
-        .mem_wb_rd,
-        .mem_wb_regwrite,
-        .mem_wb_write_data,   // 1 = memory result, 0 = alu result
-        .mem_wb_alu_out,
-        .mem_wb_load_valid,
-        .mem_wb_load_data,
+        .mem_wb_valid       (wb_valid_i),
+        .mem_wb_rd          (wb_rd_i),
+        .mem_wb_regwrite    (wb_regwrite_i),
+        .mem_wb_write_data  (wb_write_data_i),   // 1 = memory result, 0 = alu result
+        .mem_wb_alu_out     (wb_alu_out_i),
+        .mem_wb_load_valid  (wb_load_valid_i),
+        .mem_wb_load_data   (wb_load_data_i),
     
         // register file write port
-        .rf_we,
-        .rf_waddr,
-        .rf_wdata,
+        .rf_we              (rf_we),
+        .rf_waddr           (rf_waddr),
+        .rf_wdata           (rf_wdata),
         
         // Outputs
         // writeback stage outputs (forwarding / debug visibility)
-        .wb_valid,
-        .wb_regwrite_eff,     // regwrite after gating
-        .wb_rd,
-        .wb_value
+        .wb_valid           (wb_valid),
+        .wb_regwrite_eff    (wb_regwrite_eff),     // regwrite after gating
+        .wb_rd              (wb_rd),
+        .wb_value           (wb_value)
     );
 
 
 endmodule
+
 
