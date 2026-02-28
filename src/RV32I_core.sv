@@ -329,7 +329,8 @@ module RV32I_Core(
         
         
     // ---------------------- Execute Stage ----------------------
-    logic [31:0] ex_alu_out_o;
+    logic [31:0] ex_alu_out_o,
+                 ex_store_data_o;
     
     Execute_Unit EU (
         // Inputs
@@ -358,82 +359,111 @@ module RV32I_Core(
         
         //Outputs
         // Execute Unit Output
-        .alu_out        (ex_alu_out_o)
+        .alu_out        (ex_alu_out_o),
+        .store_data     (ex_store_data_o)
     );
     
     // ---------------------- EX/MEM Interstage Register ----------------------
+    // EX/MEM Pipeline Register - Inputs (from EX stage)
+    logic        mem_valid_i;
+    
+    // Data into MEM stage
+    logic [31:0] mem_alu_out_i,        
+                 mem_store_data_i,     
+                 mem_pc4_i;           
+    logic [4:0]  mem_rd_i;
+    
+    // MEM control
+    logic        mem_mem_read_i,
+                 mem_mem_write_i;
+    logic [2:0]  mem_funct3_i;     
+    
+    // WB control
+    logic       mem_regwrite_i,
+                mem_write_data_i;       
+    
     ex_mem_reg EX_MEM_REG (
         .clk                (clk),
         .rst                (rst),
         
         // Inputs
         // EX/MEM Pipeline Register - Inputs (from EX stage)
-        .flush      (1'b0),     // optional (set 0 if unused)
-        .stall      (1'b0),     // optional (set 0 if unused)
+        .flush              (1'b0),     // optional (set 0 if unused)
+        .stall              (1'b0),     // optional (set 0 if unused)
         
-        .ex_valid       (ex_valid_i),
+        .ex_valid           (ex_valid_i),
         
         // Data into MEM stage
-        .ex_alu_out     (ex_alu_out_o),        // ALU result / load-store address
-        .ex_store_data,     // store write data (after forwarding) ?? NO IDEA WHAT THIS IS
-        .ex_pc4,            // for JAL/JALR link writeback (optional)
-        .ex_rd,
+        .ex_alu_out         (ex_alu_out_o),        // ALU result / load-store address
+        .ex_store_data      (ex_store_data_o),     // store write data (after forwarding) 
+        .ex_pc4             (ex_pc4_i),            // for JAL/JALR link writeback (optional)
+        .ex_rd              (ex_rd_i),
         
         // MEM control
-        .ex_mem_read,
-        .ex_mem_write,
-        .ex_funct3,     // size/sign for loads; size for stores
+        .ex_mem_read        (ex_mem_read_i),
+        .ex_mem_write       (ex_mem_write_i),
+        .ex_funct3          (ex_funct3_i),     // size/sign for loads; size for stores
         
         // WB control
-        .ex_regwrite,
-        .ex_write_data,         // 1- Memory Result, 0 = alu result
+        .ex_regwrite        (ex_regwrite_i),
+        .ex_write_data      (ex_write_data_i),         // 1- Memory Result, 0 = alu result
         
         // Outputs
         // EX/MEM Pipeline Register - Inputs (from EX stage)
-        .ex_mem_valid           (ex_valid_i),
+        .ex_mem_valid       (mem_valid_i),
         
         // Data into MEM stage
-        .ex_mem_alu_out,
-        .ex_mem_store_data,
-        .ex_mem_pc4,           
-        .ex_mem_rd,
+        .ex_mem_alu_out     (mem_alu_out_i),
+        .ex_mem_store_data  (mem_store_data_i),
+        .ex_mem_pc4         (mem_pc4_i),           
+        .ex_mem_rd          (mem_rd_i),
         
         // MEM control
-        .ex_mem_mem_read,
-        .ex_mem_mem_write,
-        .ex_mem_funct3,     
+        .ex_mem_mem_read    (mem_mem_read_i),
+        .ex_mem_mem_write   (mem_mem_write_i),
+        .ex_mem_funct3      (mem_funct3_i),     
         
         // WB control
-        .ex_mem_regwrite,
-        .ex_mem_write_data  
+        .ex_mem_regwrite    (mem_regwrite_i),
+        .ex_mem_write_data  (mem_write_data_i)
     );
     
     // ---------------------- Memory Stage ----------------------
+    //Output Variables
+    logic        dmem_en;
+    logic        mem_load_valid;
+    logic [31:0] mem_load_data;
+    
     mem_unit MU (
         .clk                (clk),
         .rst                (rst),
     
         // Inputs
         // From EX/MEM pipeline regs
-        .ex_mem_valid_i,
-        .ex_mem_addr_i,     
-        .ex_mem_store_data_i,
-        .ex_mem_funct3_i,
-        .ex_mem_mem_read_i,
-        .ex_mem_mem_write_i,
+        .ex_mem_valid_i         (mem_valid_i),
+        .ex_mem_addr_i          (mem_alu_out_i),  // Calulated Effective Address for lw/sw ops     
+        .ex_mem_store_data_i    (mem_store_data_i),
+        .ex_mem_funct3_i        (mem_func3_i),
+        .ex_mem_mem_read_i      (mem_mem_read_i),
+        .ex_mem_mem_write_i     (mem_mem_write_i),
     
         //Outputs
         // Data memory BRAM interface (sync read, byte-write enables)
-        .dmem_addr_o,
-        .dmem_en_o,
-        .dmem_we_o,      
-        .dmem_wdata_o,
-        .dmem_rdata_i,
+        .dmem_addr_o            (dmem_addr),
+        .dmem_en_o              (dmem_en),
+        .dmem_we_o              (dmem_we),
+        .dmem_wdata_o           (dmem_wdata),
+        .dmem_rdata_i           (dmem_rdata),
     
         // To MEM/WB stage
-        .load_valid_o,    
-        .load_data_o
+        .load_valid_o           (mem_load_valid),    
+        .load_data_o            (mem_load_data) 
     );
+    
+    // Drive Wrapper Outputs
+   assign dmem_wstrb = dmem_we;   // byte enables
+   assign dmem_re    = dmem_en && (dmem_we == 4'b0); // read when enabled and not writing
+
     
     // ---------------------- MEM/WB Interstage Register ----------------------
     mem_wb_reg MEM_WB_REG(
@@ -445,8 +475,8 @@ module RV32I_Core(
         .stall_i,           (1'b0),    // optional (set 0 if unused)
     
         // Inputs from EX/MEM (control + rd + calc/alu result)
-        .ex_mem_valid_i,
-        .ex_mem_rd_i,
+        .ex_mem_valid_i     (mem_valid_i),
+        .ex_mem_rd_i        (,   
         .ex_mem_regwrite_i,
         .ex_mem_write_data_i, // 1=mem->wb, 0=alu->wb
         .ex_mem_alu_out_i,
@@ -464,6 +494,8 @@ module RV32I_Core(
         .mem_wb_load_valid_o,
         .mem_wb_load_data_o
     );
+    
+    
     
     // ---------------------- Writeback Stage ----------------------
     writeback_unit WbU (
@@ -492,3 +524,4 @@ module RV32I_Core(
 
 
 endmodule
+
