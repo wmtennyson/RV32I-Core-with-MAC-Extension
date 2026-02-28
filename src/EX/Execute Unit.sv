@@ -3,20 +3,19 @@
 module Execute_Unit(
     // Inputs for Operand A
     input logic [31:0] PC,
-                   PC4,
-                   RS1_IDEXE,
-                   RS1_EXEMEM,
-                   RS1_MEMWB,
+                       RS1_IDEXE,
+                       RS1_EXEMEM,
+                       RS1_MEMWB,
     
     // Inputs for Operand B
     input  logic [31:0] RS2_IDEXE,
-                    RS2_EXEMEM,
-                    RS2_MEMWB,
-                    imm,
+                        RS2_EXEMEM,
+                        RS2_MEMWB,
+                        imm,
     
     // Inputs for ALU Control Unit
-    input logic [2:0] func3,
-    input logic [6:0] func7,
+    input logic [2:0]   func3,
+    input logic [6:0]   func7,
     input logic [2:0]   alu_op,
     
     // Control Signals for Muxltiplexers
