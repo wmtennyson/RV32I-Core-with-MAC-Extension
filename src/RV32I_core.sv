@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
 
+// Todo: Install Stall Logic for the other regs. Currecntly Decode should only shoot stall to fetch unit
+
 module RV32I_Core(
   input  logic        clk,
   input  logic        rst,
@@ -23,10 +25,10 @@ module RV32I_Core(
 );
     
     // ---------------------- Instruction Fetch Stage ----------------------
-    // ID <- IF Stage (Control)
-    logic            if_stall,
-                     if_flush;
-    logic [31:0]     if_branch_target;
+    // ID -> IF Stage (Control)
+    logic            id_stall,
+                     id_flush;
+    logic [31:0]     id_branch_target;
 
     // IF -> ID Stage
     logic            if_instr_valid;
@@ -40,9 +42,9 @@ module RV32I_Core(
         .rst             (rst),
         
         // Control (from hazard/branch logic later)
-        .stall_i         (if_stall),
-        .flush_i         (if_flush),
-        .branch_target_i (if_branch_target),
+        .stall_i         (id_stall),
+        .flush_i         (id_flush),
+        .branch_target_i (id_branch_target),
         
         // BRAM / Instruction memory interface
         .bram_addr_o     (imem_addr),
@@ -63,10 +65,6 @@ module RV32I_Core(
                     id_pc,
                     id_pc4;
                     
-    // ID -> IF 
-    logic           id_stall,
-                    id_flush;
-    
     if_id_reg IF_ID_REG (
         .clk            (clk),
         .rst            (rst),
@@ -181,11 +179,11 @@ module RV32I_Core(
         .id_ex_mem_read_i   (id_ex_mem_read_i),
         .ex_alu_out_i       (ex_alu_out_i),
         
-        // Instruction currently in MEM stage (EX/MEM regs)
-        .ex_mem_rd_i        (ex_mem_rd_i),
+        // Instruction currently in MEM stage (EX/MEM regs)     // TAKE FROM EX/MEM
+        .ex_mem_rd_i        (ex_mem_rd_i),                  // THIS DOES NOT EXIST 
         .ex_mem_regwrite_i  (ex_mem_regwrite_i),
         .ex_mem_mem_read_i  (ex_mem_mem_read_i),
-        .ex_mem_alu_out_i   (ex_mem_alu_out_i),
+        .ex_mem_alu_out_i   (ex_mem_alu_out_i),             // THIS DOES NOT EXIST
         
         // WB stage (MEM/WB regs)
         .mem_wb_rd_i        (mem_wb_rd_i),
@@ -264,8 +262,8 @@ module RV32I_Core(
         .rst                (rst),
 
         // Inputs
-        .flush_i            (flush_o),
-        .stall_i            (stall_o),
+        .flush_i            (1'b0),             // optional (set 0 if unused)
+        .stall_i            (1'b0),             // optional (set 0 if unused)
         .instr_valid_i      (id_ex_instr_valid_o),
 
         // data
@@ -301,66 +299,66 @@ module RV32I_Core(
         // Outputs (these are decode_unit outputs)
         .id_ex_valid_o      (ex_valid_i),
 
-        .id_ex_pc_o         (id_ex_pc_o),
-        .id_ex_pc4_o        (id_ex_pc4_o),
-        .id_ex_rs1_val_o    (id_ex_rs1_val_o),
-        .id_ex_rs2_val_o    (id_ex_rs2_val_o),
-        .id_ex_imm_o        (id_ex_imm_o),
+        .id_ex_pc_o         (ex_pc_i),
+        .id_ex_pc4_o        (ex_pc4_i),
+        .id_ex_rs1_val_o    (ex_rs1_val_i),
+        .id_ex_rs2_val_o    (ex_rs2_val_i),
+        .id_ex_imm_o        (ex_imm_i),
 
-        .id_ex_rs1_o        (id_ex_rs1_o),
-        .id_ex_rs2_o        (id_ex_rs2_o),
-        .id_ex_rd_o         (id_ex_rd_o),
-        .id_ex_funct3_o     (id_ex_funct3_o),
-        .id_ex_funct7_o     (id_ex_funct7_o),
+        .id_ex_rs1_o        (ex_rs1_i),
+        .id_ex_rs2_o        (ex_rs2_i),
+        .id_ex_rd_o         (ex_rd_i),
+        .id_ex_funct3_o     (ex_funct3_i),
+        .id_ex_funct7_o     (ex_funct7_i),
 
-        .id_ex_regwrite_o   (id_ex_regwrite_o),
-        .id_ex_mem_read_o   (id_ex_mem_read_o),
-        .id_ex_mem_write_o  (id_ex_mem_write_o),
-        .id_ex_branch_o     (id_ex_branch_o),
-        .id_ex_jump_o       (id_ex_jump_o),
-        .id_ex_write_data_o (id_ex_write_data_o),
-        .id_ex_lui_o        (id_ex_lui_o),
-        .id_ex_is_jalr_o    (id_ex_is_jalr_o),
-        .id_ex_alu_op_o     (id_ex_alu_op_o),
+        .id_ex_regwrite_o   (ex_regwrite_i),
+        .id_ex_mem_read_o   (ex_mem_read_i),
+        .id_ex_mem_write_o  (ex_mem_write_i),
+        .id_ex_branch_o     (ex_branch_i),
+        .id_ex_jump_o       (ex_jump_i),
+        .id_ex_write_data_o (ex_write_data_i),
+        .id_ex_lui_o        (ex_lui_i),
+        .id_ex_is_jalr_o    (ex_is_jalr_i),
+        .id_ex_alu_op_o     (ex_alu_op_i),
 
-        .id_ex_opA_sel_o    (id_ex_opA_sel_o),
-        .id_ex_opB_sel_o    (id_ex_opB_sel_o),
-        .id_ex_rs1_sel_o    (id_ex_rs1_sel_o),
-        .id_ex_rs2_sel_o    (id_ex_rs2_sel_o)
+        .id_ex_opA_sel_o    (ex_opA_sel_i),
+        .id_ex_opB_sel_o    (ex_opB_sel_i),
+        .id_ex_rs1_sel_o    (ex_rs1_sel_i),
+        .id_ex_rs2_sel_o    (ex_rs2_sel_i)
     );
         
         
     // ---------------------- Execute Stage ----------------------
+    logic [31:0] ex_alu_out_o;
+    
     Execute_Unit EU (
         // Inputs
         // Inputs for Operand A
-        .PC,
-        .PC4,
-        .RS1_IDEXE,
-        .RS1_EXEMEM,
-        .RS1_MEMWB,
+        .PC             (ex_pc_i),
+        .RS1_IDEXE      (ex_rs1_val_i),
+        .RS1_EXEMEM     (ex_mem_alu_out),    // RS1_EXE/MEM is ex_mem_alu_out
+        .RS1_MEMWB      (wb_value),          // RS1_MEM/WB is wb_value
         
         // Inputs for Operand B
-        .RS2_IDEXE,
-        .RS2_EXEMEM,
-        .RS2_MEMWB,
-        .imm,
+        .RS2_IDEXE      (ex_rs2_val_i),
+        .RS2_EXEMEM     (ex_mem_alu_out),   // RS2_EXE/MEM is ex_mem_alu_out
+        .RS2_MEMWB      (wb_value),         // RS2_MEM/WB is wb_value
+        .imm            (ex_imm_i),
         
         // Inputs for ALU Control Unit
-        .func3,
-        .func7,
-        .alu_op,
+        .func3          (ex_func3_i),
+        .func7          (ex_func7_i),
+        .alu_op         (ex_alu_op_i),
         
         // Control Signals for Muxltiplexers
-        .RS1_sel,
-        .RS2_sel,
-        .OpA_sel,
-        .OpB_sel,
+        .RS1_sel        (ex_rs1_sel_i),
+        .RS2_sel        (ex_rs2_sel_i),
+        .OpA_sel        (ex_opA_sel_i),
+        .OpB_sel        (ex_opB_sel_i),   
         
         //Outputs
         // Execute Unit Output
-        .alu_out
-   
+        .alu_out        (ex_alu_out_o)
     );
     
     // ---------------------- EX/MEM Interstage Register ----------------------
@@ -370,14 +368,14 @@ module RV32I_Core(
         
         // Inputs
         // EX/MEM Pipeline Register - Inputs (from EX stage)
-        .flush,
-        .stall,
+        .flush      (1'b0),     // optional (set 0 if unused)
+        .stall      (1'b0),     // optional (set 0 if unused)
         
-        .ex_valid,
+        .ex_valid       (ex_valid_i),
         
         // Data into MEM stage
-        .ex_alu_out,        // ALU result / load-store address
-        .ex_store_data,     // store write data (after forwarding)
+        .ex_alu_out     (ex_alu_out_o),        // ALU result / load-store address
+        .ex_store_data,     // store write data (after forwarding) ?? NO IDEA WHAT THIS IS
         .ex_pc4,            // for JAL/JALR link writeback (optional)
         .ex_rd,
         
@@ -392,7 +390,7 @@ module RV32I_Core(
         
         // Outputs
         // EX/MEM Pipeline Register - Inputs (from EX stage)
-        .ex_mem_valid,
+        .ex_mem_valid           (ex_valid_i),
         
         // Data into MEM stage
         .ex_mem_alu_out,
@@ -447,7 +445,7 @@ module RV32I_Core(
         .stall_i,           (1'b0),    // optional (set 0 if unused)
     
         // Inputs from EX/MEM (control + rd + calc/alu result)
-        .ex_mem_valid_i     (,
+        .ex_mem_valid_i,
         .ex_mem_rd_i,
         .ex_mem_regwrite_i,
         .ex_mem_write_data_i, // 1=mem->wb, 0=alu->wb
