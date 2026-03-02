@@ -24,7 +24,7 @@ module RV32I_Core(
 );
     
     // Temp assignments
-    assign done_o = 1'b0;
+    assign done_o = 1'b0;           // TestBench Purposes
     assign trap_o = 1'b0;
     
     
@@ -35,9 +35,7 @@ module RV32I_Core(
     logic [31:0]     id_branch_target;
 
     // IF -> ID Stage
-    logic            if_instr_valid;
-    logic [31:0]     if_instr,
-                     if_pc,
+    logic [31:0]     if_pc,
                      if_pc4;
                     
     fetch_unit FeU (
@@ -56,10 +54,8 @@ module RV32I_Core(
         
         
         // Fetch outputs (to IF/ID next)
-        .instr_valid_o   (if_instr_valid),
-        .instr_o         (if_instr),
-        .pc_o            (if_pc),
-        .pc_plus4_o      (if_pc4)
+        .if_pc_o            (if_pc),
+        .if_pc_plus4_o      (if_pc4)
     );
     
     // ---------------------- IF/ID Interstage Register ----------------------
@@ -189,39 +185,39 @@ module RV32I_Core(
         
         // Outputs
         // ID -> ID/EX pipeline(to Execute stage and beyond)
-        .id_ex_rs1_val_o    (id_ex_rs1_val_o),
-        .id_ex_rs2_val_o    (id_ex_rs2_val_o),
-        .id_ex_imm_o        (id_ex_imm_o),
+        .rs1_val_o    (id_ex_rs1_val_o),
+        .rs2_val_o    (id_ex_rs2_val_o),
+        .imm_o        (id_ex_imm_o),
     
-        .id_ex_rs1_o        (id_ex_rs1_o),
-        .id_ex_rs2_o        (id_ex_rs2_o),
-        .id_ex_rd_o         (id_ex_rd_o),
-        .id_ex_funct3_o     (id_ex_funct3_o),
-        .id_ex_funct7_o     (id_ex_funct7_o),
+        .rs1_o        (id_ex_rs1_o),
+        .rs2_o        (id_ex_rs2_o),
+        .rd_o         (id_ex_rd_o),
+        .funct3_o     (id_ex_funct3_o),
+        .funct7_o     (id_ex_funct7_o),
     
         // Control to later stages
-        .id_ex_regwrite_o   (id_ex_regwrite_o),
-        .id_ex_mem_read_o   (id_ex_mem_read_o),
-        .id_ex_mem_write_o  (id_ex_mem_write_o),
-        .id_ex_branch_o     (id_ex_branch_o),
-        .id_ex_jump_o       (id_ex_jump_o),
-        .id_ex_write_data_o (id_ex_write_data_o),  
-        .id_ex_lui_o        (id_ex_lui_o),
-        .id_ex_is_jalr_o    (id_ex_is_jalr_o),
-        .id_ex_alu_op_o     (id_ex_alu_op_o),
+        .regwrite_o   (id_ex_regwrite_o),
+        .mem_read_o   (id_ex_mem_read_o),
+        .mem_write_o  (id_ex_mem_write_o),
+        .branch_o     (id_ex_branch_o),
+        .jump_o       (id_ex_jump_o),
+        .write_data_o (id_ex_write_data_o),  
+        .lui_o        (id_ex_lui_o),
+        .is_jalr_o    (id_ex_is_jalr_o),
+        .alu_op_o     (id_ex_alu_op_o),
     
         // Execute operand selects / forwarding selects
-        .id_ex_opA_sel_o    (id_ex_opA_sel_o),    
-        .id_ex_opB_sel_o    (id_ex_opB_sel_o),     
-        .id_ex_rs1_sel_o    (id_ex_rs1_sel_o),   
-        .id_ex_rs2_sel_o    (id_ex_rs2_sel_o)    
+        .opA_sel_o    (id_ex_opA_sel_o),    
+        .opB_sel_o    (id_ex_opB_sel_o),     
+        .rs1_sel_o    (id_ex_rs1_sel_o),   
+        .rs2_sel_o    (id_ex_rs2_sel_o)    
     );
     
     
     // ---------------------- ID/EX Interstage Register ----------------------
     // Bubble insertion on ID stall: prevent re-issuing the same ID instruction into EX
     logic        idex_issue_en;
-    assign idex_issue_en = ~id_stall;
+    assign  idex_issue_en = ~id_stall;
     
     // ID/EX registered outputs
     logic        ex_valid_i;
@@ -519,7 +515,6 @@ module RV32I_Core(
     logic        wb_valid,
                  wb_regwrite_eff;     // regwrite after gating
     logic [4:0]  wb_rd;
-    logic [31:0] wb_value;
     
     writeback_unit WbU (
         //Inputs
@@ -574,5 +569,6 @@ module RV32I_Core(
 
 
 endmodule
+
 
 
