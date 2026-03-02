@@ -11,6 +11,7 @@ module ex_mem_reg(
                         stall,
     
     input  logic        ex_valid,
+    input  logic [31:0] ex_instr,
     
     // Data into MEM stage
     input  logic [31:0] ex_alu_out,        // ALU result / load-store address
@@ -30,6 +31,7 @@ module ex_mem_reg(
     // Outputs
     // EX/MEM Pipeline Register - Inputs (from EX stage)
     output  logic        ex_mem_valid,
+    output  logic [31:0] ex_mem_instr_o,
     
     // Data into MEM stage
     output  logic [31:0] ex_mem_alu_out,        
@@ -54,6 +56,7 @@ module ex_mem_reg(
         if (rst || flush) begin
             // Flush/reset kills side effects (NOP bubble)
             ex_mem_valid          <= 1'b0;
+            ex_mem_instr_o        <= 32'h00000013; // NOP
     
             ex_mem_alu_out        <= 32'd0;   
             ex_mem_store_data     <= 32'd0;
@@ -70,6 +73,7 @@ module ex_mem_reg(
         end
         else if (!stall) begin
             ex_mem_valid          <= ex_valid;
+            ex_mem_instr_o        <= ex_instr;
     
             ex_mem_alu_out        <= ex_alu_out;   
             ex_mem_store_data     <= ex_store_data;
@@ -88,4 +92,3 @@ module ex_mem_reg(
     end
     
 endmodule
-
