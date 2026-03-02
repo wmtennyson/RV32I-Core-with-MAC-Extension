@@ -570,7 +570,51 @@ module RV32I_Core(
     assign mem_wb_rd_i        = wb_rd;
     assign mem_wb_regwrite_i  = wb_regwrite_eff;
     assign mem_wb_value_i     = wb_value;
-
+    
+    // ---------------------- Done / Trap Logic ----------------------
+    // Detect in-flight instruction at WB stage boundary (mem_wb reg outputs) - EBREAK = 0x00100073, ECALL = 0x00000073
+    
+    // EBREAK detection -> done
+    localparam logic [31:0] EBREAK = 32'h00100073,
+                            ECALL  = 32'h00000073;
+    
+    localparam logic [6:0]  OP_STORE  = 7'b0100011,
+                            OP_BRANCH = 7'b1100011;
+    
+    // Illegal instruction: valid slot reached WB but no recognized control signal fired.
+    logic   wb_is_ebreak, 
+            wb_is_ecall, 
+            wb_is_illegal,
+            wb_is_store,
+            wb_is_branch;
+    
+    assign wb_is_ebreak  = wb_valid_i && (wb_instr_i == EBREAK);
+    assign wb_is_ecall   = wb_valid_i && (wb_instr_i == ECALL);
+    
+    assign wb_is_store  = (wb_instr_i[6:0] == OP_STORE);
+    assign wb_is_branch = (wb_instr_i[6:0] == OP_BRANCH);
+    
+    // Illegal: arrived at WB, valid, but no side-effect and not a known system instr
+    assign wb_is_illegal = wb_valid_i
+                         && !wb_regwrite_i
+                         && !wb_load_valid_i
+                         && !wb_is_store
+                         && !wb_is_branch
+                         && (wb_instr_i != EBREAK)
+                         && (wb_instr_i != ECALL)
+                         && (wb_instr_i != 32'h00000013)   // NOP (ADDI x0,x0,0)
+                         && (wb_instr_i[1:0] == 2'b11);    // only flag full 32-bit words
+    
+    // Registered outputs (latch once asserted, hold until reset)
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst) begin
+            done_o <= 1'b0;
+            trap_o <= 1'b0;
+        end else begin
+            if (wb_is_ebreak) done_o <= 1'b1;
+            if (wb_is_illegal || wb_is_ecall) trap_o <= 1'b1;
+        end
+    end 
 
 endmodule
 
