@@ -11,6 +11,7 @@ module mem_wb_reg #(
 
     // Inputs from EX/MEM (control + rd + calc/alu result)
     input  logic             ex_mem_valid_i,
+    input  logic [31:0]      ex_mem_instr_i,
     input  logic [4:0]       ex_mem_rd_i,
     input  logic             ex_mem_regwrite_i,
     input  logic             ex_mem_write_data_i, // 1=mem->wb, 0=alu->wb
@@ -22,6 +23,7 @@ module mem_wb_reg #(
 
     // Outputs to WB stage
     output logic             mem_wb_valid_o,
+    output logic [31:0]      mem_wb_instr_o,
     output logic [4:0]       mem_wb_rd_o,
     output logic             mem_wb_regwrite_o,
     output logic             mem_wb_write_data_o,
@@ -34,6 +36,7 @@ module mem_wb_reg #(
         if (rst || flush_i) begin
             // Flush/reset kills side effects (NOP bubble)
             mem_wb_valid_o        <= 1'b0;
+            mem_wb_instr_o        <= 32'h00000013; // NOP
             mem_wb_rd_o           <= 5'd0;
             mem_wb_regwrite_o     <= 1'b0;
             mem_wb_write_data_o   <= 1'b0;
@@ -43,6 +46,7 @@ module mem_wb_reg #(
         end
         else if (!stall_i) begin
             mem_wb_valid_o        <= ex_mem_valid_i;
+            mem_wb_instr_o        <= ex_mem_instr_i;
             mem_wb_rd_o           <= ex_mem_rd_i;
             mem_wb_regwrite_o     <= ex_mem_regwrite_i;
             mem_wb_write_data_o   <= ex_mem_write_data_i;
@@ -55,3 +59,4 @@ module mem_wb_reg #(
     end
 
 endmodule
+
