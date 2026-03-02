@@ -23,11 +23,6 @@ module RV32I_Core(
   output logic        trap_o
 );
     
-    // Temp assignments
-    assign done_o = 1'b0;           // TestBench Purposes
-    assign trap_o = 1'b0;
-    
-    
     // ---------------------- Instruction Fetch Stage ----------------------
     // ID -> IF Stage (Control)
     logic            id_stall,
@@ -216,13 +211,14 @@ module RV32I_Core(
     
     // ---------------------- ID/EX Interstage Register ----------------------
     // Bubble insertion on ID stall: prevent re-issuing the same ID instruction into EX
-    logic        idex_issue_en;
+    logic   idex_issue_en;
     assign  idex_issue_en = ~id_stall;
     
     // ID/EX registered outputs
     logic        ex_valid_i;
 
-    logic [31:0] ex_pc_i,
+    logic [31:0] ex_instr_i,
+                 ex_pc_i,
                  ex_pc4_i,
                  ex_rs1_val_i,
                  ex_rs2_val_i,
@@ -257,6 +253,7 @@ module RV32I_Core(
         .flush_i            (id_stall),             // Bubble on stall
         .stall_i            (1'b0),                 // optional (set 0 if unused)
         .instr_valid_i      (id_instr_valid && idex_issue_en),
+        .instr_i            (id_instr),
 
         // data
         .pc_i               (id_pc),
@@ -290,6 +287,7 @@ module RV32I_Core(
 
         // Outputs (these are decode_unit outputs)
         .id_ex_valid_o      (ex_valid_i),
+        .id_ex_instr_o      (ex_instr_i),
 
         .id_ex_pc_o         (ex_pc_i),
         .id_ex_pc4_o        (ex_pc4_i),
@@ -364,6 +362,7 @@ module RV32I_Core(
     // ---------------------- EX/MEM Interstage Register ----------------------
     // EX/MEM Pipeline Register - Inputs (from EX stage)
     logic        mem_valid_i;
+    logic [31:0] mem_instr_i;
     
     // Data into MEM stage
     logic [31:0] mem_store_data_i,     
@@ -389,6 +388,7 @@ module RV32I_Core(
         .stall              (1'b0),     // optional (set 0 if unused)
         
         .ex_valid           (ex_valid_i),
+        .ex_instr           (ex_instr_i),
         
         // Data into MEM stage
         .ex_alu_out         (ex_alu_out_o),        // ALU result / load-store address
@@ -408,6 +408,7 @@ module RV32I_Core(
         // Outputs
         // EX/MEM Pipeline Register - Inputs (from EX stage)
         .ex_mem_valid       (mem_valid_i),
+        .ex_mem_instr       (mem_instr_i),
         
         // Data into MEM stage
         .ex_mem_alu_out     (mem_alu_out_i),
@@ -467,6 +468,7 @@ module RV32I_Core(
     // ---------------------- MEM/WB Interstage Register ----------------------
     // Outputs to WB stage
     logic             wb_valid_i;
+    logic [31:0]      wb_instr_i;
     logic [4:0]       wb_rd_i;
     logic             wb_regwrite_i,
                       wb_write_data_i;
@@ -484,6 +486,7 @@ module RV32I_Core(
     
         // Inputs from EX/MEM (control + rd + calc/alu result)
         .ex_mem_valid_i         (mem_valid_i),
+        .ex_mem_instr_i         (mem_instr_i),
         .ex_mem_rd_i            (mem_rd_i),   
         .ex_mem_regwrite_i      (mem_regwrite_i),
         .ex_mem_write_data_i    (mem_write_data_i), // 1=mem->wb, 0=alu->wb
@@ -495,6 +498,7 @@ module RV32I_Core(
     
         // Outputs to WB stage
         .mem_wb_valid_o         (wb_valid_i),
+        .mem_wb_instr_o         (wb_instr_i),
         .mem_wb_rd_o            (wb_rd_i),
         .mem_wb_regwrite_o      (wb_regwrite_i), 
         .mem_wb_write_data_o    (wb_write_data_i),
@@ -569,6 +573,5 @@ module RV32I_Core(
 
 
 endmodule
-
 
 
