@@ -279,7 +279,6 @@ module Decode_Unit (
         .funct3        (funct3),
         .redirect      (redirect_d),
         .target_pc     (target_pc_d),
-        .link_register (link_pc_d)
     );
 
     // FIX: suppress flush while stalled
