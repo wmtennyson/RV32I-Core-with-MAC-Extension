@@ -14,6 +14,7 @@ module id_ex_reg (
     input  logic        flush_i,
     input  logic        stall_i,
     input  logic        instr_valid_i,
+    input  logic [31:0] instr_i,
 
     // ID-stage data inputs
     input  logic [31:0] pc_i,
@@ -47,6 +48,7 @@ module id_ex_reg (
 
     // ID/EX registered outputs
     output logic        id_ex_valid_o,
+    output logic [31:0] id_ex_instr_o,
 
     output logic [31:0] id_ex_pc_o,
     output logic [31:0] id_ex_pc4_o,
@@ -88,6 +90,7 @@ module id_ex_reg (
     task automatic set_idex_nop();
         begin
             id_ex_valid_o       <= 1'b0;
+            id_ex_instr_o       <= 32'h00000013;  // NOP (ADDI x0,x0,0)
 
             id_ex_pc_o          <= 32'd0;
             id_ex_pc4_o         <= 32'd0;
@@ -133,6 +136,7 @@ module id_ex_reg (
             set_idex_nop();
         end else begin
             id_ex_valid_o       <= 1'b1;
+            id_ex_instr_o       <= instr_i; 
 
             id_ex_pc_o          <= pc_i;
             id_ex_pc4_o         <= pc4_i;
