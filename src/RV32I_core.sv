@@ -1,5 +1,5 @@
 `timescale 1ns / 1ps
-// UNFINISHED
+//`default_nettype none       // Disable Any Implicit Declarations (Debugging)
 
 module RV32I_Core(
   input  logic        clk,
@@ -22,6 +22,11 @@ module RV32I_Core(
   output logic        done_o,
   output logic        trap_o
 );
+    
+    // Temp assignments
+    assign done_o = 1'b0;
+    assign trap_o = 1'b0;
+    
     
     // ---------------------- Instruction Fetch Stage ----------------------
     // ID -> IF Stage (Control)
@@ -88,15 +93,6 @@ module RV32I_Core(
     );
          
     // ---------------------- Instruction Decode Stage ----------------------
-    // ID -> IF Stage
-    logic [31:0]    id_branch_target;
-
-    // EX -> ID Stage 
-    logic           id_instr_valid;
-    logic [31:0]    id_instr,
-                    id_pc,
-                    id_pc4;
-                     
     // WB -> ID Stage
     logic           id_we;
     logic [4:0]     id_rd;
@@ -122,17 +118,14 @@ module RV32I_Core(
     logic [31:0]    mem_wb_value_i;  
     
     // ID -> ID/EX Stage
-    logic           id_ex_valid_o;
-
-    logic [31:0]    id_ex_pc_o,
-                    id_ex_pc4_o,
-                    id_ex_rs1_val_o,
+    logic [31:0]    id_ex_rs1_val_o,
                     id_ex_rs2_val_o,
                     id_ex_imm_o;
 
     logic [4:0]     id_ex_rs1_o,
                     id_ex_rs2_o,
                     id_ex_rd_o;
+                    
     logic [2:0]     id_ex_funct3_o;
     logic [6:0]     id_ex_funct7_o;
 
@@ -142,14 +135,14 @@ module RV32I_Core(
                     id_ex_mem_write_o,
                     id_ex_branch_o,
                     id_ex_jump_o,
-                    id_ex_write_data_o,  
+                    id_ex_write_data_o,     // 1 = mem result, 0 = alu result
                     id_ex_lui_o,
                     id_ex_is_jalr_o;
     logic [2:0]     id_ex_alu_op_o;
 
     // Mux Selects
-    logic [1:0]     id_ex_opA_sel_o;    
-    logic           id_ex_opB_sel_o;     
+    logic           id_ex_opA_sel_o,    
+                    id_ex_opB_sel_o;     
     logic [1:0]     id_ex_rs1_sel_o,   
                     id_ex_rs2_sel_o; 
     
@@ -226,6 +219,10 @@ module RV32I_Core(
     
     
     // ---------------------- ID/EX Interstage Register ----------------------
+    // Bubble insertion on ID stall: prevent re-issuing the same ID instruction into EX
+    logic        idex_issue_en;
+    assign idex_issue_en = ~id_stall;
+    
     // ID/EX registered outputs
     logic        ex_valid_i;
 
@@ -251,8 +248,8 @@ module RV32I_Core(
                  ex_is_jalr_i;
     logic [2:0]  ex_alu_op_i;
 
-    logic [1:0]  ex_opA_sel_i;  
-    logic        ex_opB_sel_i;
+    logic        ex_opA_sel_i,  
+                 ex_opB_sel_i;
     logic [1:0]  ex_rs1_sel_i,
                  ex_rs2_sel_i;
     
@@ -261,13 +258,13 @@ module RV32I_Core(
         .rst                (rst),
 
         // Inputs
-        .flush_i            (1'b0),             // optional (set 0 if unused)
-        .stall_i            (1'b0),             // optional (set 0 if unused)
-        .instr_valid_i      (id_ex_instr_valid_o),
+        .flush_i            (id_stall),             // Bubble on stall
+        .stall_i            (1'b0),                 // optional (set 0 if unused)
+        .instr_valid_i      (id_instr_valid && idex_issue_en),
 
         // data
-        .pc_i               (id_ex_pc_o),
-        .pc4_i              (id_ex_pc4_o),
+        .pc_i               (id_pc),
+        .pc4_i              (id_pc4),
         .rs1_val_i          (id_ex_rs1_val_o),
         .rs2_val_i          (id_ex_rs2_val_o),
         .imm_i              (id_ex_imm_o),
@@ -278,15 +275,15 @@ module RV32I_Core(
         .funct3_i           (id_ex_funct3_o),
         .funct7_i           (id_ex_funct7_o),
 
-        // control (use your gated versions if you have them)
-        .regwrite_i         (id_ex_regwrite_o),
-        .mem_read_i         (id_ex_mem_read_o),
-        .mem_write_i        (id_ex_mem_write_o),
-        .branch_i           (id_ex_branch_o),
-        .jump_i             (id_ex_jump_o),
-        .write_data_i       (id_ex_write_data_o),
-        .lui_i              (id_ex_lui_o),
-        .is_jalr_i          (id_ex_is_jalr_o),
+        // control (gate to NOP on stall)
+        .regwrite_i         (id_ex_regwrite_o   & idex_issue_en),
+        .mem_read_i         (id_ex_mem_read_o   & idex_issue_en),
+        .mem_write_i        (id_ex_mem_write_o  & idex_issue_en),
+        .branch_i           (id_ex_branch_o     & idex_issue_en),
+        .jump_i             (id_ex_jump_o       & idex_issue_en),
+        .write_data_i       (id_ex_write_data_o & idex_issue_en),
+        .lui_i              (id_ex_lui_o        & idex_issue_en),
+        .is_jalr_i          (id_ex_is_jalr_o    & idex_issue_en),
         .alu_op_i           (id_ex_alu_op_o),
 
         // execute selects
@@ -328,26 +325,32 @@ module RV32I_Core(
         
         
     // ---------------------- Execute Stage ----------------------
+    // Execute Unit Outputs
     logic [31:0] ex_alu_out_o,
                  ex_store_data_o;
+    
+    // Forwarding Variables
+    logic [31:0] mem_alu_out_i, 
+                 wb_value;
+
     
     Execute_Unit EU (
         // Inputs
         // Inputs for Operand A
         .PC             (ex_pc_i),
         .RS1_IDEXE      (ex_rs1_val_i),
-        .RS1_EXEMEM     (ex_mem_alu_out),    // RS1_EXE/MEM is ex_mem_alu_out
+        .RS1_EXEMEM     (mem_alu_out_i),       // RS1_EXE/MEM is ex_mem_alu_out
         .RS1_MEMWB      (wb_value),          // RS1_MEM/WB is wb_value
         
         // Inputs for Operand B
         .RS2_IDEXE      (ex_rs2_val_i),
-        .RS2_EXEMEM     (ex_mem_alu_out),   // RS2_EXE/MEM is ex_mem_alu_out
+        .RS2_EXEMEM     (mem_alu_out_i),      // RS2_EXE/MEM is ex_mem_alu_out
         .RS2_MEMWB      (wb_value),         // RS2_MEM/WB is wb_value
         .imm            (ex_imm_i),
         
         // Inputs for ALU Control Unit
-        .func3          (ex_func3_i),
-        .func7          (ex_func7_i),
+        .func3          (ex_funct3_i),
+        .func7          (ex_funct7_i),
         .alu_op         (ex_alu_op_i),
         
         // Control Signals for Muxltiplexers
@@ -367,8 +370,7 @@ module RV32I_Core(
     logic        mem_valid_i;
     
     // Data into MEM stage
-    logic [31:0] mem_alu_out_i,        
-                 mem_store_data_i,     
+    logic [31:0] mem_store_data_i,     
                  mem_pc4_i;           
     logic [4:0]  mem_rd_i;
     
@@ -429,7 +431,8 @@ module RV32I_Core(
     
     // ---------------------- Memory Stage ----------------------
     //Output Variables
-    logic        dmem_en;
+    logic        dmem_req;
+    logic [3:0]  dmem_wstrb_int;     // NOTE: assumes mem_unit outputs byte strobes here
     logic        mem_load_valid;
     logic [31:0] mem_load_data;
     
@@ -442,15 +445,15 @@ module RV32I_Core(
         .ex_mem_valid_i         (mem_valid_i),
         .ex_mem_addr_i          (mem_alu_out_i),  // Calulated Effective Address for lw/sw ops     
         .ex_mem_store_data_i    (mem_store_data_i),
-        .ex_mem_funct3_i        (mem_func3_i),
+        .ex_mem_funct3_i        (mem_funct3_i),
         .ex_mem_mem_read_i      (mem_mem_read_i),
         .ex_mem_mem_write_i     (mem_mem_write_i),
     
         //Outputs
         // Data memory BRAM interface (sync read, byte-write enables)
         .dmem_addr_o            (dmem_addr),
-        .dmem_en_o              (dmem_en),
-        .dmem_we_o              (dmem_we),
+        .dmem_en_o              (dmem_req),
+        .dmem_we_o              (dmem_wstrb_int),
         .dmem_wdata_o           (dmem_wdata),
         .dmem_rdata_i           (dmem_rdata),
     
@@ -459,9 +462,10 @@ module RV32I_Core(
         .load_data_o            (mem_load_data) 
     );
     
-    // Drive Wrapper Outputs
-   assign dmem_wstrb = dmem_we;   // byte enables
-   assign dmem_re    = dmem_en && (dmem_we == 4'b0); // read when enabled and not writing
+   // Drive wrapper outputs
+    assign dmem_wstrb = dmem_wstrb_int;
+    assign dmem_we    = dmem_req && (|dmem_wstrb_int);         // write when enabled and any byte strobe set
+    assign dmem_re    = dmem_req && (dmem_wstrb_int == 4'b0);  // read when enabled and no write strobes
 
     
     // ---------------------- MEM/WB Interstage Register ----------------------
@@ -540,6 +544,33 @@ module RV32I_Core(
         .wb_rd              (wb_rd),
         .wb_value           (wb_value)
     );
+
+    // ----------------------- Final Assignments to Tie up Loose Ends---------------
+    // WB -> ID (Decode expects these names)
+    assign id_we    = rf_we;
+    assign id_rd    = rf_waddr;
+    assign id_wdata = rf_wdata;
+
+    // EX stage taps (from ID/EX reg outputs)
+    assign id_ex_rd_i        = ex_rd_i;
+    assign id_ex_rs1_i       = ex_rs1_i;
+    assign id_ex_rs2_i       = ex_rs2_i;
+    assign id_ex_regwrite_i  = ex_regwrite_i;
+    assign id_ex_mem_read_i  = ex_mem_read_i;
+
+    // EX ALU result tap (combinational)
+    assign ex_alu_out_i      = ex_alu_out_o;
+
+    // MEM stage taps (from EX/MEM reg outputs)
+    assign ex_mem_rd_i       = mem_rd_i;
+    assign ex_mem_regwrite_i = mem_regwrite_i;
+    assign ex_mem_mem_read_i = mem_mem_read_i;
+    assign ex_mem_alu_out_i  = mem_alu_out_i;
+
+    // WB stage taps (use gated WB outputs)
+    assign mem_wb_rd_i        = wb_rd;
+    assign mem_wb_regwrite_i  = wb_regwrite_eff;
+    assign mem_wb_value_i     = wb_value;
 
 
 endmodule
