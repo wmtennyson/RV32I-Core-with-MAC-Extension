@@ -40,9 +40,9 @@ module mem_wb_reg #(
             mem_wb_rd_o           <= 5'd0;
             mem_wb_regwrite_o     <= 1'b0;
             mem_wb_write_data_o   <= 1'b0;
-            mem_wb_alu_out_o      <= '0;
+            mem_wb_alu_out_o      <= 32'b0;
             mem_wb_load_valid_o   <= 1'b0;
-            mem_wb_load_data_o    <= '0;
+            mem_wb_load_data_o    <= 32'b0;
         end
         else if (!stall_i) begin
             mem_wb_valid_o        <= ex_mem_valid_i;
