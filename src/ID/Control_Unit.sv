@@ -39,12 +39,14 @@ module Control_Unit(
             // R-type
             7'b0110011: begin 
                 regwrite = 1'b1;
+                OpA_sel  = 1'b1;        // RS1
                 alu_op   = `R_TYPE;
             end
             
             // I-type
             7'b0010011: begin 
                 regwrite  = 1'b1;
+                OpA_sel   = 1'b1;       // RS1
                 OpB_sel   = 1'b1;       //imm
                 alu_op    = `I_TYPE;
             end
@@ -53,30 +55,33 @@ module Control_Unit(
             7'b0000011: begin
                 regwrite   = 1'b1;
                 mem_read   = 1'b1;
-                OpB_sel    = 1'b1;      // base + offset
-                write_data = 1'b1;      // Mem -> WB
+                OpA_sel    = 1'b1;       // RS1 base
+                OpB_sel    = 1'b1;       // Imm offset
+                write_data = 1'b1;       // Mem -> WB
                 alu_op     = `LOAD;
             end
             
             // Store
             7'b0100011: begin 
                 mem_write = 1'b1;
-                OpB_sel   = 1'b1;       // base + offset
+                OpA_sel   = 1'b1;       // RS1 base
+                OpB_sel   = 1'b1;       // Imm offset
                 alu_op    = `STORE;
             end
             
             // Branch
             7'b1100011: begin 
                 branch   = 1'b1;
+                OpA_sel  = 1'b1;       // RS1 for Compare
                 alu_op   = `BRANCH;
             end
             
             // JAL and JALR
             7'b1101111, 7'b1100111: begin 
-                regwrite = 1'b1;        
-                jump     = 1'b1;
-                OpA_sel  = 1;               // For JALR immediate offset
-                is_jalr    = (opcode == 7'b1100111) ? 1 : 0; // JALR only
+                regwrite  = 1'b1;        
+                jump      = 1'b1;
+                OpA_sel   = (opcode == 7'b1100111) ? 1 : 0;     // For JALR immediate offset
+                is_jalr   = (opcode == 7'b1100111) ? 1 : 0;     // JALR only
                 alu_op    = `JUMP;
             end
             
@@ -84,8 +89,15 @@ module Control_Unit(
             7'b0110111, 7'b0010111: begin 
                 regwrite = 1;
                 OpB_sel  = 1;   // imm
-                OpA_sel  = (opcode == 7'b0010111) ? 1 : 0; // AUIPC only
-                lui      = (opcode == 7'b0110111) ? 1 : 0; // LUI only
+                if (opcode == 7'b0010111) begin
+                    // AUIPC
+                    OpA_sel = 1'b0; // PC
+                    lui     = 1'b0;
+                end else begin
+                    // LUI
+                    OpA_sel = 1'b0; 
+                    lui     = 1'b1;
+                end 
                 alu_op    = `U_TYPE;
             end
             
@@ -94,3 +106,4 @@ module Control_Unit(
     end
    
 endmodule
+
