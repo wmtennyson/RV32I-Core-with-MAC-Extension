@@ -103,6 +103,22 @@ module Decode_Unit (
         .rdata2_o (rs2_rf)
     );
 
+    // Implement a WB-> ID Bypass in order to provide fresh operands
+    // Give to Branch Operand Mux, ID/EX Reg
+    logic [31:0] id_rs1_data, id_rs2_data;          
+
+    always_comb begin
+      id_rs1_data = rs1_rf;
+      id_rs2_data = rs2_rf;
+    
+      if (wb_we_i && (wb_rd_i != 5'd0) && (wb_rd_i == rs1))
+        id_rs1_data = wb_wdata_i;
+    
+      if (wb_we_i && (wb_rd_i != 5'd0) && (wb_rd_i == rs2))
+        id_rs2_data = wb_wdata_i;
+    end
+
+
     // -------------------------
     // Immediate generator
     // -------------------------
@@ -234,8 +250,8 @@ module Decode_Unit (
     logic [31:0] br_rs1_val, br_rs2_val;
 
     always_comb begin
-        br_rs1_val = rs1_rf;
-        br_rs2_val = rs2_rf;
+        br_rs1_val = id_rs1_data;
+        br_rs2_val = id_rs2_data;
 
         unique case (BrFwd_A)
             2'b00: br_rs1_val = rs1_rf;
@@ -261,7 +277,7 @@ module Decode_Unit (
     logic [31:0] target_pc_d;
     logic [31:0] link_pc_d; // currently unused in this module
 
-    // FIX: do not allow redirect decisions while stalled
+    // Do not allow redirect decisions while stalled
     logic branch_eff, jump_eff, jalr_eff;
     assign branch_eff = branch_g   & ~stall_o;
     assign jump_eff   = jump_g     & ~stall_o;
@@ -278,7 +294,7 @@ module Decode_Unit (
         .pcsrc         (jalr_eff),
         .funct3        (funct3),
         .redirect      (redirect_d),
-        .target_pc     (target_pc_d),
+        .target_pc     (target_pc_d)
     );
 
     // FIX: suppress flush while stalled
@@ -290,7 +306,8 @@ module Decode_Unit (
     // Bubble on invalid / redirect / stall / reset
     // -------------------------
     logic bubble;
-    assign bubble = rst | !instr_valid_i | flush_o | stall_o;
+    
+    assign bubble = rst | !instr_valid_i | flush_o;
 
     always_comb begin
         // defaults = bubble
@@ -320,8 +337,8 @@ module Decode_Unit (
         rs2_sel_o    = 2'b00;
 
         if (!bubble) begin
-            rs1_val_o    = rs1_rf;
-            rs2_val_o    = rs2_rf;
+            rs1_val_o    = id_rs1_data;
+            rs2_val_o    = id_rs2_data;
             imm_o        = imm_d;
 
             rs1_o        = rs1;
