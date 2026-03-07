@@ -134,8 +134,8 @@ module RV32I_Core(
     // Mux Selects
     logic           id_ex_opA_sel_o,    
                     id_ex_opB_sel_o;     
-    logic [1:0]     id_ex_rs1_sel_o,   
-                    id_ex_rs2_sel_o; 
+    logic [1:0]     ex_rs1_sel_i,   
+                    ex_rs2_sel_i; 
     
     Decode_Unit DeU (
         .clk                (clk),
@@ -204,8 +204,8 @@ module RV32I_Core(
         // Execute operand selects / forwarding selects
         .opA_sel_o    (id_ex_opA_sel_o),    
         .opB_sel_o    (id_ex_opB_sel_o),     
-        .rs1_sel_o    (id_ex_rs1_sel_o),   
-        .rs2_sel_o    (id_ex_rs2_sel_o)    
+        .rs1_sel_o    (ex_rs1_sel_i),   
+        .rs2_sel_o    (ex_rs2_sel_i)    
     );
     
     
@@ -242,8 +242,7 @@ module RV32I_Core(
 
     logic        ex_opA_sel_i,  
                  ex_opB_sel_i;
-    logic [1:0]  ex_rs1_sel_i,
-                 ex_rs2_sel_i;
+  
     
     id_ex_reg ID_EX_REG (
         .clk                (clk),
@@ -571,51 +570,117 @@ module RV32I_Core(
     assign mem_wb_regwrite_i  = wb_regwrite_eff;
     assign mem_wb_value_i     = wb_value;
     
+    
     // ---------------------- Done / Trap Logic ----------------------
     // Detect in-flight instruction at WB stage boundary (mem_wb reg outputs) - EBREAK = 0x00100073, ECALL = 0x00000073
     
     // EBREAK detection -> done
     localparam logic [31:0] EBREAK = 32'h00100073,
                             ECALL  = 32'h00000073;
-    
-    localparam logic [6:0]  OP_STORE  = 7'b0100011,
-                            OP_BRANCH = 7'b1100011;
-    
-    // Illegal instruction: valid slot reached WB but no recognized control signal fired.
+                            
     logic   wb_is_ebreak, 
             wb_is_ecall, 
-            wb_is_illegal,
-            wb_is_store,
-            wb_is_branch;
-    
-    assign wb_is_ebreak  = wb_valid_i && (wb_instr_i == EBREAK);
-    assign wb_is_ecall   = wb_valid_i && (wb_instr_i == ECALL);
-    
-    assign wb_is_store  = (wb_instr_i[6:0] == OP_STORE);
-    assign wb_is_branch = (wb_instr_i[6:0] == OP_BRANCH);
-    
-    // Illegal: arrived at WB, valid, but no side-effect and not a known system instr
-    assign wb_is_illegal = wb_valid_i
-                         && !wb_regwrite_i
-                         && !wb_load_valid_i
-                         && !wb_is_store
-                         && !wb_is_branch
-                         && (wb_instr_i != EBREAK)
-                         && (wb_instr_i != ECALL)
-                         && (wb_instr_i != 32'h00000013)   // NOP (ADDI x0,x0,0)
-                         && (wb_instr_i[1:0] == 2'b11);    // only flag full 32-bit words
-    
-    // Registered outputs (latch once asserted, hold until reset)
-    always_ff @(posedge clk or posedge rst) begin
-        if (rst) begin
-            done_o <= 1'b0;
-            trap_o <= 1'b0;
-        end else begin
-            if (wb_is_ebreak) done_o <= 1'b1;
-            if (wb_is_illegal || wb_is_ecall) trap_o <= 1'b1;
-        end
-    end 
+            wb_is_illegal;
 
+    assign wb_is_ebreak = wb_valid_i && (wb_instr_i == EBREAK);
+    assign wb_is_ecall  = wb_valid_i && (wb_instr_i == ECALL);                      
+    
+    // Function to Check for Legal Instructions
+    function automatic logic legal_rv32i(input logic [31:0] instr);
+        
+        // Define Variables
+        logic [6:0] OpCode;
+        logic [2:0] funct3; 
+        logic [6:0] funct7;
+        
+        // Check for Legality Depending on the instruction type
+        OpCode = instr[6:0];
+        funct3 = instr[14:12];
+        funct7 = instr[31:25];
+        
+        legal_rv32i = 1'b0;
+
+        unique case (OpCode)
+            7'b0110111: legal_rv32i = 1'b1;                     // LUI
+            7'b0010111: legal_rv32i = 1'b1;                     // AUIPC
+            7'b1101111: legal_rv32i = 1'b1;                     // JAL
+            7'b1100111: legal_rv32i = (funct3 == 3'b000);       // JALR
+    
+            7'b1100011: begin                               // BRANCH
+                unique case (funct3)
+                    3'b000, 3'b001, 3'b100, 3'b101, 3'b110, 3'b111: legal_rv32i = 1'b1;
+                    default: legal_rv32i = 1'b0;
+                endcase
+            end
+    
+            7'b0000011: begin                               // LOAD
+                unique case (funct3)
+                    3'b000,3'b001,3'b010,3'b100,3'b101: legal_rv32i = 1'b1;
+                    default: legal_rv32i = 1'b0;
+                endcase
+            end
+    
+            7'b0100011: begin                               // STORE
+                unique case (funct3)
+                    3'b000,3'b001,3'b010: legal_rv32i = 1'b1;
+                    default: legal_rv32i = 1'b0;
+                endcase
+            end
+    
+            7'b0010011: begin                               // OP-IMM
+                unique case (funct3)
+                    3'b000,3'b010,3'b011,3'b100,3'b110,3'b111: legal_rv32i = 1'b1;
+                    3'b001: legal_rv32i = (funct7 == 7'b0000000);                       // SLLI
+                    3'b101: legal_rv32i = (funct7 == 7'b0000000) || (funct7 == 7'b0100000); // SRLI/SRAI
+                    default: legal_rv32i = 1'b0;
+                endcase
+            end
+    
+            7'b0110011: begin                               // OP (R-type)
+                unique case (funct3)
+                    3'b000: legal_rv32i = (funct7 == 7'b0000000) || (funct7 == 7'b0100000); // ADD/SUB
+                    3'b001: legal_rv32i = (funct7 == 7'b0000000);                       // SLL
+                    3'b010: legal_rv32i = (funct7 == 7'b0000000);                       // SLT
+                    3'b011: legal_rv32i = (funct7 == 7'b0000000);                       // SLTU
+                    3'b100: legal_rv32i = (funct7 == 7'b0000000);                       // XOR
+                    3'b101: legal_rv32i = (funct7 == 7'b0000000) || (funct7 == 7'b0100000); // SRL/SRA
+                    3'b110: legal_rv32i = (funct7 == 7'b0000000);                       // OR
+                    3'b111: legal_rv32i = (funct7 == 7'b0000000);                       // AND
+                    default: legal_rv32i = 1'b0;
+                endcase
+            end
+    
+            7'b0001111: legal_rv32i = 1'b1;                 // FENCE/FENCE.I (treat as legal no-op for now)
+    
+            7'b1110011: legal_rv32i = (instr == ECALL) || (instr == EBREAK); // SYSTEM (no CSR support yet)
+    
+            default: legal_rv32i = 1'b0;
+        endcase
+    endfunction
+    
+    // Finally Check if The Instruction is legal or not
+    assign wb_is_illegal = wb_valid_i && (wb_instr_i[1:0] == 2'b11) && !legal_rv32i(wb_instr_i);
+    
+    // Registered outputs (latch once asserted, hold until reset) 
+    always_ff @(posedge clk or posedge rst) begin 
+        if (rst) begin 
+            done_o <= 1'b0; 
+            trap_o <= 1'b0; 
+        end 
+        else begin 
+            if (wb_is_illegal || wb_is_ecall) trap_o <= 1'b1;  // trap priority
+            else if (wb_is_ebreak)            done_o <= 1'b1;
+        end 
+    end
+    
+    
+    // Debug to test trap:
+always_ff @(posedge clk) begin
+if (!rst && (wb_is_illegal || wb_is_ecall) && wb_valid_i) begin
+$display("TRAP SET @%0t: wb_instr=0x%08x opcode=0x%02x",
+ $time, wb_instr_i, wb_instr_i[6:0]);
+end
+end 
+    
 endmodule
-
 
