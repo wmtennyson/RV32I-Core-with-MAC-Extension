@@ -1,12 +1,6 @@
 `timescale 1ns/1ps
 `include "Def.vh"
 
-// ------------------------------------------------------------
-// ID/EX Pipeline Register + OpA Select Builder
-// - Computes opA_sel from opA_sel_bit (your decode control)
-// - Registers all ID-stage outputs into ID/EX outputs
-// - Inserts bubble (NOP) on reset/flush/stall/invalid
-// ------------------------------------------------------------
 module id_ex_reg (
     input  logic        clk,
     input  logic        rst,
@@ -72,20 +66,12 @@ module id_ex_reg (
     output logic        id_ex_is_jalr_o,
     output logic [2:0]  id_ex_alu_op_o,
 
-    output logic [1:0]  id_ex_opA_sel_o,  
+    output logic        id_ex_opA_sel_o,  
     output logic        id_ex_opB_sel_o,
     output logic [1:0]  id_ex_rs1_sel_o,
     output logic [1:0]  id_ex_rs2_sel_o
 );
 
-
-    logic [1:0] opA_sel_d;
-
-    always_comb begin
-        opA_sel_d = 2'b10;            
-        if (opA_sel_i) opA_sel_d = 2'b00; 
-
-    end
 
     task automatic set_idex_nop();
         begin
@@ -114,7 +100,7 @@ module id_ex_reg (
             id_ex_is_jalr_o     <= 1'b0;
             id_ex_alu_op_o      <= `NOP;
 
-            id_ex_opA_sel_o     <= 2'b10; 
+            id_ex_opA_sel_o     <= 1'b0; 
             id_ex_opB_sel_o     <= 1'b0;
 
             id_ex_rs1_sel_o     <= 2'b00;
@@ -131,25 +117,25 @@ module id_ex_reg (
         end else if (flush_i) begin
             set_idex_nop();
         end else if (stall_i) begin
-            set_idex_nop();
+            // Hold State
         end else if (!instr_valid_i) begin
             set_idex_nop();
         end else begin
             id_ex_valid_o       <= 1'b1;
-            id_ex_instr_o       <= instr_i; 
-
+            id_ex_instr_o       <= instr_i;
+        
             id_ex_pc_o          <= pc_i;
             id_ex_pc4_o         <= pc4_i;
             id_ex_rs1_val_o     <= rs1_val_i;
             id_ex_rs2_val_o     <= rs2_val_i;
             id_ex_imm_o         <= imm_i;
-
+        
             id_ex_rs1_o         <= rs1_i;
             id_ex_rs2_o         <= rs2_i;
             id_ex_rd_o          <= rd_i;
             id_ex_funct3_o      <= funct3_i;
             id_ex_funct7_o      <= funct7_i;
-
+        
             id_ex_regwrite_o    <= regwrite_i;
             id_ex_mem_read_o    <= mem_read_i;
             id_ex_mem_write_o   <= mem_write_i;
@@ -159,13 +145,14 @@ module id_ex_reg (
             id_ex_lui_o         <= lui_i;
             id_ex_is_jalr_o     <= is_jalr_i;
             id_ex_alu_op_o      <= alu_op_i;
-
-            id_ex_opA_sel_o     <= opA_sel_d;
+        
+            id_ex_opA_sel_o     <= opA_sel_i;
             id_ex_opB_sel_o     <= opB_sel_i;
-
+        
             id_ex_rs1_sel_o     <= rs1_sel_i;
             id_ex_rs2_sel_o     <= rs2_sel_i;
-        end
+        end 
     end
 
 endmodule
+
