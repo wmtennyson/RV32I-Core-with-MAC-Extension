@@ -281,8 +281,6 @@ module RV32I_Core(
         // execute selects
         .opA_sel_i          (id_ex_opA_sel_o),
         .opB_sel_i          (id_ex_opB_sel_o),
-        .rs1_sel_i          (id_ex_rs1_sel_o),
-        .rs2_sel_i          (id_ex_rs2_sel_o),
 
         // Outputs (these are decode_unit outputs)
         .id_ex_valid_o      (ex_valid_i),
@@ -311,9 +309,7 @@ module RV32I_Core(
         .id_ex_alu_op_o     (ex_alu_op_i),
 
         .id_ex_opA_sel_o    (ex_opA_sel_i),
-        .id_ex_opB_sel_o    (ex_opB_sel_i),
-        .id_ex_rs1_sel_o    (ex_rs1_sel_i),
-        .id_ex_rs2_sel_o    (ex_rs2_sel_i)
+        .id_ex_opB_sel_o    (ex_opB_sel_i)
     );
         
         
