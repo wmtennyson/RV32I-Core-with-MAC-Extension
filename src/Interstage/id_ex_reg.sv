@@ -37,8 +37,6 @@ module id_ex_reg (
     // Execute select inputs
     input  logic        opA_sel_i,     
     input  logic        opB_sel_i,         
-    input  logic [1:0]  rs1_sel_i,         
-    input  logic [1:0]  rs2_sel_i,
 
     // ID/EX registered outputs
     output logic        id_ex_valid_o,
@@ -68,10 +66,7 @@ module id_ex_reg (
 
     output logic        id_ex_opA_sel_o,  
     output logic        id_ex_opB_sel_o,
-    output logic [1:0]  id_ex_rs1_sel_o,
-    output logic [1:0]  id_ex_rs2_sel_o
 );
-
 
     task automatic set_idex_nop();
         begin
@@ -103,8 +98,6 @@ module id_ex_reg (
             id_ex_opA_sel_o     <= 1'b0; 
             id_ex_opB_sel_o     <= 1'b0;
 
-            id_ex_rs1_sel_o     <= 2'b00;
-            id_ex_rs2_sel_o     <= 2'b00;
         end
     endtask
 
@@ -149,8 +142,6 @@ module id_ex_reg (
             id_ex_opA_sel_o     <= opA_sel_i;
             id_ex_opB_sel_o     <= opB_sel_i;
         
-            id_ex_rs1_sel_o     <= rs1_sel_i;
-            id_ex_rs2_sel_o     <= rs2_sel_i;
         end 
     end
 
