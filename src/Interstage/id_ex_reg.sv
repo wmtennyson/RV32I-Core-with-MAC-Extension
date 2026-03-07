@@ -65,7 +65,7 @@ module id_ex_reg (
     output logic [2:0]  id_ex_alu_op_o,
 
     output logic        id_ex_opA_sel_o,  
-    output logic        id_ex_opB_sel_o,
+    output logic        id_ex_opB_sel_o
 );
 
     task automatic set_idex_nop();
@@ -144,6 +144,7 @@ module id_ex_reg (
         
         end 
     end
-
+    
 endmodule
+
 
