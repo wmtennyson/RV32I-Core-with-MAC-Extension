@@ -77,6 +77,7 @@ module mem_unit (
     logic [1:0]  rd_addr_lsb_q;
     logic [2:0]  rd_funct3_q;
 
+    // Request Tracking
     always_ff @(posedge clk) begin
         if (rst) begin
             rd_req_q       <= 1'b0;
@@ -91,25 +92,27 @@ module mem_unit (
 
     assign load_valid_o = rd_req_q;
 
-    logic [7:0]  byte_sel;
-    logic [15:0] half_sel;
-
     always_comb begin
         // default
         load_data_o = 32'd0;
 
-        // Select byte/half from the returned word based on saved addr bits
-        byte_sel = (dmem_rdata_i >> (8  * rd_addr_lsb_q)) & 8'hFF;
-        half_sel = (dmem_rdata_i >> (16 * rd_addr_lsb_q[1])) & 16'hFFFF;
-
-        unique case (rd_funct3_q)
-            3'b000: load_data_o = {{24{byte_sel[7]}}, byte_sel}; // LB
-            3'b001: load_data_o = {{16{half_sel[15]}}, half_sel}; // LH
-            3'b010: load_data_o = dmem_rdata_i; // LW
-            3'b100: load_data_o = {24'd0, byte_sel}; // LBU
-            3'b101: load_data_o = {16'd0, half_sel}; // LHU
-            default: load_data_o = 32'd0;
-        endcase
+        if(rd_req_q) begin
+            logic [7:0]  byte_sel;
+            logic [15:0] half_sel;
+    
+            // Select byte/half from the returned word based on saved addr bits
+            byte_sel = (dmem_rdata_i >> (8  * rd_addr_lsb_q)) & 8'hFF;
+            half_sel = (dmem_rdata_i >> (16 * rd_addr_lsb_q[1])) & 16'hFFFF;
+    
+            unique case (rd_funct3_q)
+                3'b000: load_data_o = {{24{byte_sel[7]}}, byte_sel};    // LB
+                3'b001: load_data_o = {{16{half_sel[15]}}, half_sel};   // LH
+                3'b010: load_data_o = dmem_rdata_i;                     // LW
+                3'b100: load_data_o = {24'd0, byte_sel};                // LBU
+                3'b101: load_data_o = {16'd0, half_sel};                // LHU
+                default: load_data_o = 32'd0;
+            endcase
+        end
     end
 
 endmodule
