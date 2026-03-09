@@ -250,23 +250,21 @@ module Decode_Unit (
     logic [31:0] br_rs1_val, br_rs2_val;
 
     always_comb begin
-        br_rs1_val = id_rs1_data;
-        br_rs2_val = id_rs2_data;
-
+    
         unique case (BrFwd_A)
-            2'b00: br_rs1_val = rs1_rf;
+            2'b00: br_rs1_val = id_rs1_data;
             2'b01: br_rs1_val = mem_wb_value_i;
             2'b10: br_rs1_val = ex_mem_alu_out_i;
             2'b11: br_rs1_val = ex_alu_out_i;
-            default: br_rs1_val = rs1_rf;
+            default: br_rs1_val = id_rs1_data;
         endcase
 
         unique case (BrFwd_B)
-            2'b00: br_rs2_val = rs2_rf;
+            2'b00: br_rs2_val = id_rs2_data;
             2'b01: br_rs2_val = mem_wb_value_i;
             2'b10: br_rs2_val = ex_mem_alu_out_i;
             2'b11: br_rs2_val = ex_alu_out_i;
-            default: br_rs2_val = rs2_rf;
+            default: br_rs2_val = id_rs2_data;
         endcase
     end
 
@@ -366,3 +364,4 @@ module Decode_Unit (
     end
 
 endmodule
+
