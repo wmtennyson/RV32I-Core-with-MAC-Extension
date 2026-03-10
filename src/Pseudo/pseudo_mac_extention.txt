@@ -1,0 +1,166 @@
+============================================================
+mac_extension_pseudocode.txt
+RISC-V RV32 core: Fixed-point MAC extension (64-bit output)
+============================================================
+
+Goal:
+  - Add a fixed-point multiply-accumulate capability (MAC)
+  - Inputs are 32-bit fixed-point (signed by default)
+  - Accumulator/result is 64-bit (signed)
+  - Provide a clean way to read out 64-bit result via 32-bit regfile
+
+Recommended ISA shape (Option A: internal accumulator):
+  MAC      rs1, rs2
+  MACCLR
+  MACRDLO  rd
+  MACRDHI  rd
+
+Meaning:
+  MAC        acc64 = acc64 + fx_mul(rs1, rs2)
+  MACCLR     acc64 = 0
+  MACRDLO    rd = acc64[31:0]
+  MACRDHI    rd = acc64[63:32]
+
+Notes:
+  - This avoids requiring a 64-bit register file.
+  - fx_mul returns a 64-bit value scaled back to the chosen Q format.
+
+
+============================================================
+0) Fixed-point format definition
+============================================================
+
+Choose a Q format for rs1/rs2 (common examples: Q1.31, Q16.16).
+FRAC_BITS = number of fractional bits 'n' in Qm.n.
+
+Example:
+  Q16.16 -> FRAC_BITS = 16
+  Q1.31  -> FRAC_BITS = 31
+
+const FRAC_BITS = <set_this_constant>
+
+
+============================================================
+1) Helper functions (pseudo)
+============================================================
+
+function s64 sign_extend_s32_to_s64(s32 x):
+    return (s64)x
+
+function s64 fx_mul_to_acc(s32 a, s32 b, int FRAC_BITS):
+    s64 prod = sign_extend_s32_to_s64(a) * sign_extend_s32_to_s64(b)
+    s64 scaled = arithmetic_shift_right(prod, FRAC_BITS)
+    return scaled
+
+function bool overflow_signed_64(s64 a, s64 b, s64 sum):
+    return ((a ^ b) >= 0) AND ((a ^ sum) < 0)
+
+function s64 sat_add_s64(s64 a, s64 b):
+    s64 sum = a + b
+    if overflow_signed_64(a, b, sum):
+        if a < 0: return MIN_INT64
+        else:     return MAX_INT64
+    else:
+        return sum
+
+
+============================================================
+2) Architectural state
+============================================================
+
+state s64 acc64_s64 = 0
+
+
+============================================================
+3) Instruction decode (conceptual)
+============================================================
+
+In ID stage, decode the instruction into a MAC operation and controls.
+Exact bitfields/opcodes depend on your custom encoding.
+
+We assume decode produces:
+  id.mac_op         in { NONE, MAC, MACCLR, MACRDLO, MACRDHI }
+  id.uses_rs1
+  id.uses_rs2
+  id.regwrite       only for MACRDLO/MACRDHI
+  id.rd, id.rs1, id.rs2
+
+ID_STAGE_DECODE(instr):
+    id.mac_op   = NONE
+    id.regwrite = 0
+    id.uses_rs1 = 0
+    id.uses_rs2 = 0
+
+    if instr matches MAC:
+        id.mac_op   = MAC
+        id.uses_rs1 = 1
+        id.uses_rs2 = 1
+
+    else if instr matches MACCLR:
+        id.mac_op = MACCLR
+
+    else if instr matches MACRDLO:
+        id.mac_op   = MACRDLO
+        id.regwrite = 1
+
+    else if instr matches MACRDHI:
+        id.mac_op   = MACRDHI
+        id.regwrite = 1
+
+    return id
+
+
+============================================================
+4) Pipeline integration strategy
+============================================================
+
+Commit model used here:
+  - Update acc64 in WB stage when instruction retires
+  - Carry mac_op and mac_delta through the pipeline
+
+Add pipeline fields for MAC ops through ID/EX -> EX/MEM -> MEM/WB:
+  pipe.mac_op
+  pipe.mac_delta
+  pipe.valid
+
+
+EX_STAGE(pipe_in):
+    pipe_out = pipe_in
+
+    if pipe_in.valid == 1 AND pipe_in.mac_op == MAC:
+        pipe_out.mac_delta = fx_mul_to_acc(pipe_in.rs1_val, pipe_in.rs2_val, FRAC_BITS)
+    else:
+        pipe_out.mac_delta = 0
+
+    return pipe_out
+
+
+MEM_STAGE(pipe_in):
+    pipe_out = pipe_in
+    return pipe_out
+
+
+WB_STAGE(pipe_in):
+    wb_value_32     = existing_wb_mux(pipe_in)
+    wb_regwrite_eff = existing_wb_enable(pipe_in)
+
+    if pipe_in.valid == 1:
+        if pipe_in.mac_op == MACCLR:
+            acc64_s64 = 0
+        else if pipe_in.mac_op == MAC:
+            acc64_s64 = sat_add_s64(acc64_s64, pipe_in.mac_delta)
+
+    if pipe_in.valid == 1:
+        if pipe_in.mac_op == MACRDLO:
+            wb_value_32     = lower_32_bits(acc64_s64)
+            wb_regwrite_eff = 1 AND (pipe_in.rd != x0)
+
+        else if pipe_in.mac_op == MACRDHI:
+            wb_value_32     = upper_32_bits(acc64_s64)
+            wb_regwrite_eff = 1 AND (pipe_in.rd != x0)
+
+        else if pipe_in.mac_op == MAC OR pipe_in.mac_op == MACCLR:
+            wb_regwrite_eff = 0
+
+    if wb_regwrite_eff:
+        regfile[pipe_in.rd] = wb_value_32
