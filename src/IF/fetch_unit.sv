@@ -24,6 +24,7 @@ module fetch_unit#(
     // Fetch PC Register
     logic [31:0] pc_next;
     logic [31:0] pc_f;
+    logic [31:0] pc_d1;    // delayed PC (matches BRAM rdata timing)
     
     // Next PC logic (Combinational)
     always_comb begin
@@ -38,17 +39,20 @@ module fetch_unit#(
     always_ff @(posedge clk) begin 
         if(rst) begin
             pc_f <= RESET_VECTOR;
+            pc_d1 <= RESET_VECTOR;       
         end else if(!stall_i) begin
-            pc_f <= pc_next; 
+            pc_d1 <= pc_f;           // Capture Request PC
+            pc_f  <= pc_next;        // Advance Request PC
         end 
-        // If stalled, pc_f freezes 
+        // If stalled, pc_f & pc_d1 freezes 
     end
     
     // Continuous outputs
     assign bram_addr_o   = pc_f;
     assign bram_en_o     = 1'b1; // Always enable read for instruction memory
     
-    assign if_pc_o       = pc_f;
-    assign if_pc_plus4_o = pc_f + 32'd4;
+    assign if_pc_o       = pc_d1;
+    assign if_pc_plus4_o = pc_d1 + 32'd4;
     
 endmodule
+
