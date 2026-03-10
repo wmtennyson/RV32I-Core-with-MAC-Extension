@@ -1,0 +1,249 @@
+`timescale 1ns/1ps
+
+// TB for RV32I_Core that prints EXACTLY ONE terminal result.
+// Terminal priority: TRAP > DONE > TIMEOUT.
+// - IMEM: 1-cycle latency BRAM-style
+// - DMEM: byte-addressed, byte strobes, 1-cycle read latency
+
+module tb_RV32I_Core;
+
+  // --------------------------------------------------------------------------
+  // Clock / reset
+  // --------------------------------------------------------------------------
+  logic clk, rst;
+  localparam time TCLK = 10ns;
+
+  initial begin
+    clk = 1'b0;
+    forever #(TCLK/2) clk = ~clk;
+  end
+
+  initial begin
+    rst = 1'b1;
+    repeat (8) @(posedge clk);
+    rst = 1'b0;
+  end
+
+  // --------------------------------------------------------------------------
+  // DUT interface
+  // --------------------------------------------------------------------------
+  logic [31:0] imem_addr;
+  logic        imem_en;
+  logic [31:0] imem_rdata;
+
+  logic [31:0] dmem_addr;
+  logic [31:0] dmem_wdata;
+  logic [3:0]  dmem_wstrb;
+  logic        dmem_we;
+  logic        dmem_re;
+  logic [31:0] dmem_rdata;
+
+  logic done_o, trap_o;
+
+  RV32I_Core dut (
+    .clk        (clk),
+    .rst        (rst),
+
+    .imem_addr  (imem_addr),
+    .imem_en    (imem_en),
+    .imem_rdata (imem_rdata),
+
+    .dmem_addr  (dmem_addr),
+    .dmem_wdata (dmem_wdata),
+    .dmem_wstrb (dmem_wstrb),
+    .dmem_we    (dmem_we),
+    .dmem_re    (dmem_re),
+    .dmem_rdata (dmem_rdata),
+
+    .done_o     (done_o),
+    .trap_o     (trap_o)
+  );
+
+  // --------------------------------------------------------------------------
+  // IMEM model: 1-cycle latency ROM
+  // --------------------------------------------------------------------------
+  localparam int IMEM_WORDS = 256;
+  logic [31:0] imem [0:IMEM_WORDS-1];
+  logic [31:0] imem_addr_q;
+
+  localparam logic [31:0] NOP    = 32'h0000_0013; // addi x0,x0,0
+  localparam logic [31:0] EBREAK = 32'h0010_0073;
+  localparam logic [31:0] ECALL  = 32'h0000_0073;
+
+  initial begin : init_imem
+    int i;
+    for (i = 0; i < IMEM_WORDS; i++) imem[i] = NOP;
+
+    // Program:
+    // x1=5; x2=10; x3=15 -> sw mem[0]
+    // lw mem[0] -> x4; x5=x4+3=18; x6=18
+    // bne x5,x6 -> fail
+    // sw x5 -> mem[4]; lw x7 <- mem[4]
+    // beq x7,x6 -> pass else fail
+    // pass: ebreak  (done_o)
+    // fail: ecall   (trap_o)
+
+    imem[16'h0000 >> 2] = 32'h0050_0093; // addi x1,x0,5
+    imem[16'h0004 >> 2] = 32'h00a0_0113; // addi x2,x0,10
+    imem[16'h0008 >> 2] = 32'h0020_81b3; // add  x3,x1,x2
+    imem[16'h000C >> 2] = 32'h0030_2023; // sw   x3,0(x0)
+    imem[16'h0010 >> 2] = 32'h0000_2203; // lw   x4,0(x0)
+    imem[16'h0014 >> 2] = 32'h0032_0293; // addi x5,x4,3
+    imem[16'h0018 >> 2] = 32'h0120_0313; // addi x6,x0,18
+    imem[16'h001C >> 2] = 32'h0062_9e63; // bne  x5,x6, +0x1C -> 0x0038 (fail)
+    imem[16'h0020 >> 2] = 32'h0050_2223; // sw   x5,4(x0)
+    imem[16'h0024 >> 2] = 32'h0040_2383; // lw   x7,4(x0)
+    imem[16'h0028 >> 2] = 32'h0063_8463; // beq  x7,x6, +0x08 -> 0x0030 (pass)
+    imem[16'h002C >> 2] = 32'h00c0_006f; // jal  x0, +0x0C -> 0x0038 (fail)
+    imem[16'h0030 >> 2] = EBREAK;        // pass
+    imem[16'h0034 >> 2] = 32'h0000_006f; // spin
+    imem[16'h0038 >> 2] = ECALL;         // fail
+    imem[16'h003C >> 2] = 32'h0000_006f; // spin
+  end
+
+  always_ff @(posedge clk) begin
+    if (rst) imem_addr_q <= 32'd0;
+    else if (imem_en) imem_addr_q <= imem_addr;
+  end
+
+  always_comb begin
+    int unsigned idx;
+    idx = imem_addr_q[31:2];
+    if (idx < IMEM_WORDS) imem_rdata = imem[idx];
+    else                  imem_rdata = NOP;
+  end
+
+  // Track last fetch for debug
+  logic [31:0] last_fetch_addr;
+  always_ff @(posedge clk) begin
+    if (rst) last_fetch_addr <= 32'd0;
+    else if (imem_en) last_fetch_addr <= imem_addr;
+  end
+
+  // --------------------------------------------------------------------------
+  // DMEM model: byte array, byte strobes, 1-cycle read latency
+  // --------------------------------------------------------------------------
+  localparam int DMEM_BYTES = 4096;
+  byte dmem [0:DMEM_BYTES-1];
+
+  logic        dmem_re_q;
+  logic [31:0] dmem_addr_q;
+
+  function automatic logic [31:0] read_word(input logic [31:0] addr);
+    int unsigned a;
+    begin
+      a = addr;
+      read_word = {dmem[a+3], dmem[a+2], dmem[a+1], dmem[a+0]};
+    end
+  endfunction
+
+  initial begin : init_dmem
+    int i;
+    for (i = 0; i < DMEM_BYTES; i++) dmem[i] = 8'h00;
+  end
+
+  always_ff @(posedge clk) begin
+    if (!rst && dmem_we) begin
+      int unsigned a;
+      a = dmem_addr;
+
+      if (a + 3 < DMEM_BYTES) begin
+        if (dmem_wstrb[0]) dmem[a+0] <= dmem_wdata[7:0];
+        if (dmem_wstrb[1]) dmem[a+1] <= dmem_wdata[15:8];
+        if (dmem_wstrb[2]) dmem[a+2] <= dmem_wdata[23:16];
+        if (dmem_wstrb[3]) dmem[a+3] <= dmem_wdata[31:24];
+      end else begin
+        $display("[%0t] WARNING: DMEM write out of range addr=0x%08x", $time, dmem_addr);
+      end
+    end
+  end
+
+  always_ff @(posedge clk) begin
+    if (rst) begin
+      dmem_re_q   <= 1'b0;
+      dmem_addr_q <= 32'd0;
+    end else begin
+      dmem_re_q <= dmem_re;
+      if (dmem_re) dmem_addr_q <= dmem_addr;
+    end
+  end
+
+  always_comb begin
+    if (dmem_re_q) begin
+      int unsigned a;
+      a = dmem_addr_q;
+      if (a + 3 < DMEM_BYTES) dmem_rdata = {dmem[a+3], dmem[a+2], dmem[a+1], dmem[a+0]};
+      else                    dmem_rdata = 32'h0;
+    end else begin
+      dmem_rdata = 32'h0;
+    end
+  end
+
+  // --------------------------------------------------------------------------
+  // Terminal control (ONE result only): TRAP > DONE > TIMEOUT
+  // --------------------------------------------------------------------------
+  localparam int MAX_CYCLES = 5000;
+  int cycles;
+  bit timed_out;
+
+  initial begin
+    cycles    = 0;
+    timed_out = 0;
+
+    @(negedge rst);
+
+    fork
+      // Timeout thread
+      begin : timeout_thread
+        repeat (MAX_CYCLES) begin
+          @(posedge clk);
+          cycles++;
+        end
+        timed_out = 1;
+      end
+
+      // Trap thread (priority)
+      begin : trap_thread
+        @(posedge trap_o);
+      end
+
+      // Done thread
+      begin : done_thread
+        @(posedge done_o);
+      end
+    join_any
+    disable fork;
+
+    // allow NBAs to settle
+    #1ps;
+    
+    if (timed_out) begin
+      $display("\nFAIL: timeout after %0d cycles. done=%b trap=%b last_fetch_addr=0x%08x\n",
+               MAX_CYCLES, done_o, trap_o, last_fetch_addr);
+      $finish;
+    end
+
+    if (trap_o) begin
+      $display("\nFAIL: trap_o asserted at cycle %0d. done=%b last_fetch_addr=0x%08x\n",
+               cycles, done_o, last_fetch_addr);
+      $finish;
+    end
+
+    // done_o must be true here
+    if (read_word(32'h0000_0000) !== 32'd15) begin
+      $display("\nFAIL: mem[0] = %0d (0x%08x), expected 15\n",
+               read_word(32'h0000_0000), read_word(32'h0000_0000));
+      $finish;
+    end
+
+    if (read_word(32'h0000_0004) !== 32'd18) begin
+      $display("\nFAIL: mem[4] = %0d (0x%08x), expected 18\n",
+               read_word(32'h0000_0004), read_word(32'h0000_0004));
+      $finish;
+    end
+
+    $display("\nPASS: done_o asserted at cycle %0d. mem[0]=15 mem[4]=18\n", cycles);
+    $finish;
+  end
+
+endmodule
