@@ -44,16 +44,6 @@ module Hazard_Unit (
         end
     end
 
-    // Identify ops that need operand *in ID* (branch compare / JALR base)
-    // Only these require stalling on an EX/MEM load.
-    logic is_branch, is_jalr, needs_id_operand;
-
-    always_comb begin
-        is_branch        = (opcode_i == 7'b1100011);
-        is_jalr          = (opcode_i == 7'b1100111);
-        needs_id_operand = instr_valid_i && (is_branch || is_jalr);
-    end
-
     // Hazard detection
     logic hazard_ex_load;   // classic load-use (ID/EX is load)
     logic hazard_mem_load;  // only for branch/jalr needing operand in ID (EX/MEM is load)
@@ -70,7 +60,7 @@ module Hazard_Unit (
         end
 
         // EX/MEM load hazard - only stall when current instruction needs the value in ID
-        if (needs_id_operand && ex_mem_mem_read_i && (ex_mem_rd_i != 5'd0)) begin
+        if (instr_valid_i && ex_mem_mem_read_i && (ex_mem_rd_i != 5'd0)) begin
             if ((uses_rs1 && (ex_mem_rd_i == rs1_i)) || (uses_rs2 && (ex_mem_rd_i == rs2_i))) begin
                 hazard_mem_load = 1'b1;
             end
