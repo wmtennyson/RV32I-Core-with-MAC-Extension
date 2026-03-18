@@ -1,58 +1,51 @@
 `timescale 1ns / 1ps
-
 module fetch_unit#(
     parameter logic [31:0] RESET_VECTOR = 32'h0000_0000
 )(
     input  logic        clk,
-    input  logic        rst, // active high reset
-    
-    // Hazard and pipeline ctrl
-    input  logic        stall_i, // freeze pc
-    input  logic        flush_i, // branch taken, update pc to target
-    input  logic [31:0] branch_target_i, // branch address
-    
-    // Memory interface (BRAM, synchronous)
-    output logic [31:0] bram_addr_o, 
-    output logic        bram_en_o,   
-    // (bram_rdata_i now goes straight to if_id_reg.sv)
-    
-    // Outputs to IF/ID Pipeline Register
+    input  logic        rst,
+    input  logic        stall_i,
+    input  logic        flush_i,
+    input  logic [31:0] branch_target_i,
+    output logic [31:0] bram_addr_o,
+    output logic        bram_en_o,
     output logic [31:0] if_pc_o,
     output logic [31:0] if_pc_plus4_o
 );
-    
-    // Fetch PC Register
-    logic [31:0] pc_next;
     logic [31:0] pc_f;
-    logic [31:0] pc_d1;    // delayed PC (matches BRAM rdata timing)
-    
-    // Next PC logic (Combinational)
-    always_comb begin
-        if(flush_i) begin 
-            pc_next = branch_target_i;    // jump to branch target
+    logic [31:0] req_pc_q;
+    logic        post_rst_q;
+
+    always_ff @(posedge clk) begin
+        if (rst) begin
+            pc_f        <= RESET_VECTOR;
+            req_pc_q    <= RESET_VECTOR;
+            post_rst_q  <= 1'b1;
         end else begin
-            pc_next = pc_f + 32'd4;       // normal step
+            post_rst_q <= 1'b0;
+
+            // Track the address actually being sent to IMEM this cycle.
+            // Stall: re-sending req_pc_q, so don't update it.
+            // Flush: redirect immediately to branch target.
+            if (!stall_i || flush_i)
+                req_pc_q <= flush_i ? branch_target_i : pc_f;
+
+            if (flush_i)
+                pc_f <= branch_target_i;
+            else if (!stall_i && !post_rst_q)
+                pc_f <= pc_f + 32'd4;
         end
     end
 
-    // PC Register Update
-    always_ff @(posedge clk) begin 
-        if(rst) begin
-            pc_f <= RESET_VECTOR;
-            pc_d1 <= RESET_VECTOR;       
-        end else if(!stall_i) begin
-            pc_d1 <= pc_f;           // Capture Request PC
-            pc_f  <= pc_next;        // Advance Request PC
-        end 
-        // If stalled, pc_f & pc_d1 freezes 
-    end
-    
-    // Continuous outputs
-    assign bram_addr_o   = pc_f;
-    assign bram_en_o     = 1'b1; // Always enable read for instruction memory
-    
-    assign if_pc_o       = pc_d1;
-    assign if_pc_plus4_o = pc_d1 + 32'd4;
-    
-endmodule
+    // During stall: re-present req_pc_q so the IMEM keeps returning the
+    // in-flight instruction. When stall releases, bram_rdata_i will have
+    // the correct next instruction and if_id_reg can capture it normally.
+    assign bram_addr_o   = flush_i ? branch_target_i :
+                           stall_i  ? req_pc_q :
+                                      pc_f;
+    assign bram_en_o     = 1'b1;   // always enabled - no dead cycles
 
+    assign if_pc_o       = req_pc_q;
+    assign if_pc_plus4_o = req_pc_q + 32'd4;
+
+endmodule
