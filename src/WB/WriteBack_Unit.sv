@@ -10,6 +10,9 @@ module writeback_unit (
     input  logic [31:0] mem_wb_alu_out,
     input  logic        mem_wb_load_valid,
     input  logic [31:0] mem_wb_load_data,
+    
+    input  logic [31:0] mem_wb_pc4,            // NEW
+    input  logic        mem_wb_wb_pc4_sel,
 
     // register file write port
     output logic        rf_we,
@@ -24,28 +27,28 @@ module writeback_unit (
 );
 
     always_comb begin
-        // default pass-through assignments
         wb_valid = mem_wb_valid;
         wb_rd    = mem_wb_rd;
 
-        // writeback mux selects between alu result and load result
-        wb_value = mem_wb_write_data ? mem_wb_load_data
-                                     : mem_wb_alu_out;
+        // NEW: PC4 has highest priority
+        if (mem_wb_wb_pc4_sel) begin
+            wb_value = mem_wb_pc4;
+        end else begin
+            wb_value = mem_wb_write_data ? mem_wb_load_data : mem_wb_alu_out;
+        end
 
-        // effective register write enable
-        // instruction must be valid
-        // instruction must request register write
-        // destination register must not be x0
-        // if load, memory data must be valid
+        // NEW: allow regwrite even if load_valid is 0 when selecting PC4 or ALU
         wb_regwrite_eff = mem_wb_valid
-                        && mem_wb_regwrite
-                        && (mem_wb_rd != 5'd0)
-                        && (!mem_wb_write_data || mem_wb_load_valid);
+                       && mem_wb_regwrite
+                       && (mem_wb_rd != 5'd0)
+                       && ( mem_wb_wb_pc4_sel
+                            || !mem_wb_write_data
+                            || mem_wb_load_valid );
 
-        // drive register file interface
         rf_we    = wb_regwrite_eff;
         rf_waddr = mem_wb_rd;
         rf_wdata = wb_value;
     end
 
 endmodule
+
