@@ -30,6 +30,7 @@ module id_ex_reg (
     input  logic        branch_i,
     input  logic        jump_i,
     input  logic        write_data_i,
+    input  logic        wb_pc4_sel_i,
     input  logic        lui_i,
     input  logic        is_jalr_i,
     input  logic [2:0]  alu_op_i,
@@ -60,6 +61,8 @@ module id_ex_reg (
     output logic        id_ex_branch_o,
     output logic        id_ex_jump_o,
     output logic        id_ex_write_data_o,
+    output logic        id_ex_wb_pc4_sel_o,
+
     output logic        id_ex_lui_o,
     output logic        id_ex_is_jalr_o,
     output logic [2:0]  id_ex_alu_op_o,
@@ -91,6 +94,7 @@ module id_ex_reg (
             id_ex_branch_o      <= 1'b0;
             id_ex_jump_o        <= 1'b0;
             id_ex_write_data_o  <= 1'b0;
+            id_ex_wb_pc4_sel_o  <= 1'b0;
             id_ex_lui_o         <= 1'b0;
             id_ex_is_jalr_o     <= 1'b0;
             id_ex_alu_op_o      <= `NOP;
@@ -135,6 +139,7 @@ module id_ex_reg (
             id_ex_branch_o      <= branch_i;
             id_ex_jump_o        <= jump_i;
             id_ex_write_data_o  <= write_data_i;
+            id_ex_wb_pc4_sel_o  <= wb_pc4_sel_i;
             id_ex_lui_o         <= lui_i;
             id_ex_is_jalr_o     <= is_jalr_i;
             id_ex_alu_op_o      <= alu_op_i;
@@ -144,7 +149,6 @@ module id_ex_reg (
         
         end 
     end
-    
-endmodule
 
+endmodule
 
