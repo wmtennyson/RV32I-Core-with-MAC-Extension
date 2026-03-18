@@ -1,5 +1,4 @@
 `timescale 1ns / 1ps
-
 module mem_wb_reg #(
     parameter int XLEN = 32
 ) (
@@ -16,6 +15,9 @@ module mem_wb_reg #(
     input  logic             ex_mem_regwrite_i,
     input  logic             ex_mem_write_data_i, // 1=mem->wb, 0=alu->wb
     input  logic [XLEN-1:0]  ex_mem_alu_out_i,
+    input  logic [XLEN-1:0]  ex_mem_pc4_i,            
+    input  logic             ex_mem_wb_pc4_sel_i,     
+
 
     // Inputs from mem_unit (asserted on DMEM response cycle)
     input  logic             mem_load_valid_i,
@@ -28,8 +30,12 @@ module mem_wb_reg #(
     output logic             mem_wb_regwrite_o,
     output logic             mem_wb_write_data_o,
     output logic [XLEN-1:0]  mem_wb_alu_out_o,
+    output logic [XLEN-1:0]  mem_wb_pc4_o,            
+    output logic             mem_wb_wb_pc4_sel_o,     
     output logic             mem_wb_load_valid_o,
-    output logic [XLEN-1:0]  mem_wb_load_data_o
+    output logic [XLEN-1:0]  mem_wb_load_data_o,
+    
+    output logic             stall_req_o
 );
 
     // Shadow regs: EX/MEM metadata from previous cycle
@@ -39,6 +45,8 @@ module mem_wb_reg #(
     logic            sh_regwrite;
     logic            sh_write_data;
     logic [XLEN-1:0] sh_alu_out;
+    logic [XLEN-1:0] sh_pc4;             
+    logic            sh_wb_pc4_sel;      
 
     // 1-entry buffer for the next instruction
     logic            buf_valid;
@@ -47,6 +55,8 @@ module mem_wb_reg #(
     logic            buf_regwrite;
     logic            buf_write_data;
     logic [XLEN-1:0] buf_alu_out;
+    logic [XLEN-1:0] buf_pc4;            
+    logic            buf_wb_pc4_sel;     
 
     always_ff @(posedge clk) begin
         if (rst || flush_i) begin
@@ -57,6 +67,8 @@ module mem_wb_reg #(
             mem_wb_regwrite_o   <= 1'b0;
             mem_wb_write_data_o <= 1'b0;
             mem_wb_alu_out_o    <= '0;
+            mem_wb_pc4_o        <= '0;       
+            mem_wb_wb_pc4_sel_o <= 1'b0;        
             mem_wb_load_valid_o <= 1'b0;
             mem_wb_load_data_o  <= '0;
 
@@ -67,6 +79,8 @@ module mem_wb_reg #(
             sh_regwrite   <= 1'b0;
             sh_write_data <= 1'b0;
             sh_alu_out    <= '0;
+             sh_pc4       <= '0;    
+            sh_wb_pc4_sel <= 1'b0;   
 
             buf_valid      <= 1'b0;
             buf_instr      <= 32'h00000013;
@@ -74,6 +88,8 @@ module mem_wb_reg #(
             buf_regwrite   <= 1'b0;
             buf_write_data <= 1'b0;
             buf_alu_out    <= '0;
+            buf_pc4        <= '0;     
+            buf_wb_pc4_sel <= 1'b0;   
         end
         else if (!stall_i) begin
             // Update shadow with current EX/MEM metadata every cycle
@@ -83,6 +99,8 @@ module mem_wb_reg #(
             sh_regwrite   <= ex_mem_regwrite_i;
             sh_write_data <= ex_mem_write_data_i;
             sh_alu_out    <= ex_mem_alu_out_i;
+            sh_pc4        <= ex_mem_pc4_i;            
+            sh_wb_pc4_sel <= ex_mem_wb_pc4_sel_i;     
 
             // Priority 1: If a buffered instruction to emit and no load response collision, emit it
             if (buf_valid && !mem_load_valid_i) begin
@@ -92,6 +110,8 @@ module mem_wb_reg #(
                 mem_wb_regwrite_o   <= buf_regwrite;
                 mem_wb_write_data_o <= buf_write_data;
                 mem_wb_alu_out_o    <= buf_alu_out;
+                mem_wb_pc4_o        <= buf_pc4;         
+                mem_wb_wb_pc4_sel_o <= buf_wb_pc4_sel;  
 
                 mem_wb_load_valid_o <= 1'b0;
                 // keep last load data for waveform readability
@@ -103,13 +123,15 @@ module mem_wb_reg #(
             // Priority 2: load response cycle
             else if (mem_load_valid_i) begin
                 // Buffer current EX/MEM metadata - because this cycle's WB slot is used to retire the load response.
-                if (ex_mem_valid_i) begin
+                if (ex_mem_valid_i & !buf_valid) begin
                     buf_valid      <= ex_mem_valid_i;
                     buf_instr      <= ex_mem_instr_i;
                     buf_rd         <= ex_mem_rd_i;
                     buf_regwrite   <= ex_mem_regwrite_i;
                     buf_write_data <= ex_mem_write_data_i;
                     buf_alu_out    <= ex_mem_alu_out_i;
+                    buf_pc4        <= ex_mem_pc4_i;            
+                    buf_wb_pc4_sel <= ex_mem_wb_pc4_sel_i;     
                 end
 
                 // Retire the load using previous-cycle shadow metadata
@@ -122,6 +144,8 @@ module mem_wb_reg #(
                 mem_wb_write_data_o <= 1'b1;
 
                 mem_wb_alu_out_o    <= sh_alu_out;
+                mem_wb_pc4_o        <= sh_pc4;        
+                mem_wb_wb_pc4_sel_o <= 1'b0; 
 
                 mem_wb_load_valid_o <= 1'b1;
                 mem_wb_load_data_o  <= mem_load_data_i;
@@ -135,6 +159,8 @@ module mem_wb_reg #(
                 mem_wb_regwrite_o   <= ex_mem_regwrite_i;
                 mem_wb_write_data_o <= ex_mem_write_data_i;
                 mem_wb_alu_out_o    <= ex_mem_alu_out_i;
+                mem_wb_pc4_o        <= ex_mem_pc4_i;         
+                mem_wb_wb_pc4_sel_o <= ex_mem_wb_pc4_sel_i; 
 
                 mem_wb_load_valid_o <= 1'b0;
                 mem_wb_load_data_o  <= mem_wb_load_data_o; // hold for waveform readability
@@ -142,6 +168,8 @@ module mem_wb_reg #(
         end
         // else: stall -> hold everything (outputs, shadow, buffer)
     end
-
+    
+    // Drive Stall Req
+    assign stall_req_o = buf_valid && mem_load_valid_i;
 endmodule
 
