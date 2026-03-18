@@ -24,13 +24,24 @@ module mem_unit (
     output logic [31:0] load_data_o
 );
 
-    assign dmem_addr_o = ex_mem_addr_i;
+    // Variables
+    logic [1:0]  addr_lsb;
+    logic [31:0] aligned_addr;
 
-    // Always enable memory when valid instruction in MEM stage
+    logic        rd_req_q;
+    logic [1:0]  rd_addr_lsb_q;
+    logic [2:0]  rd_funct3_q;
+
+    logic [7:0]  byte_sel;
+    logic [15:0] half_sel;
+    
+    assign addr_lsb     = ex_mem_addr_i[1:0];
+    assign aligned_addr = {ex_mem_addr_i[31:2], 2'b00};
+
+    assign dmem_addr_o = aligned_addr;
+
+    // Enable memory only when an active MEM-stage instruction is using DMEM
     assign dmem_en_o = ex_mem_valid_i && (ex_mem_mem_read_i || ex_mem_mem_write_i);
-
-    logic [1:0] addr_lsb;
-    assign addr_lsb = ex_mem_addr_i[1:0];
 
     always_comb begin
         dmem_we_o    = 4'b0000;
@@ -55,13 +66,10 @@ module mem_unit (
                 end
 
                 3'b010: begin // SW
-                    // word aligned by addr[1:0]==00
+                    // Require word alignment: addr[1:0] == 00
                     if (addr_lsb == 2'b00) begin
                         dmem_we_o    = 4'b1111;
                         dmem_wdata_o = ex_mem_store_data_i;
-                    end else begin
-                        dmem_we_o    = 4'b0000; 
-                        dmem_wdata_o = 32'd0;
                     end
                 end
 
@@ -72,10 +80,6 @@ module mem_unit (
             endcase
         end
     end
-
-    logic        rd_req_q;
-    logic [1:0]  rd_addr_lsb_q;
-    logic [2:0]  rd_funct3_q;
 
     // Request Tracking
     always_ff @(posedge clk) begin
@@ -97,8 +101,6 @@ module mem_unit (
         load_data_o = 32'd0;
 
         if(rd_req_q) begin
-            logic [7:0]  byte_sel;
-            logic [15:0] half_sel;
     
             // Select byte/half from the returned word based on saved addr bits
             byte_sel = (dmem_rdata_i >> (8  * rd_addr_lsb_q)) & 8'hFF;
@@ -116,3 +118,4 @@ module mem_unit (
     end
 
 endmodule
+
