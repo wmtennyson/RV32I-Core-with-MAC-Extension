@@ -27,7 +27,8 @@ module ex_mem_reg(
     // WB control
     input  logic        ex_regwrite,
                         ex_write_data,         // 1- Memory Result, 0 = alu result
-    
+                        ex_wb_pc4_sel,
+        
     // Outputs
     // EX/MEM Pipeline Register - Inputs (from EX stage)
     output  logic        ex_mem_valid,
@@ -46,9 +47,11 @@ module ex_mem_reg(
     
     // WB control
     output  logic       ex_mem_regwrite,
-                        ex_mem_write_data          
+                        ex_mem_write_data,
+                        ex_mem_wb_pc4_sel        
     
     );
+
    // NOTE: Only Asser this Stall for EX/MEM reg when downstream backpressure is needed.
    // DO NOT stall EX/MEM for Load-Use Hazards
    
@@ -68,7 +71,8 @@ module ex_mem_reg(
             ex_mem_funct3         <= 3'd0;     
     
             ex_mem_regwrite       <= 1'b0;
-            ex_mem_write_data     <= 1'b0;     
+            ex_mem_write_data     <= 1'b0; 
+            ex_mem_wb_pc4_sel     <= 1'b0;    
     
         end
         else if (!stall) begin
@@ -85,11 +89,11 @@ module ex_mem_reg(
             ex_mem_funct3         <= ex_valid ? ex_funct3 : 3'd0;
         
             ex_mem_regwrite       <= ex_regwrite  & ex_valid;
-            ex_mem_write_data     <= ex_write_data & ex_valid;    
+            ex_mem_write_data     <= ex_write_data & ex_valid;   
+            ex_mem_wb_pc4_sel     <= ex_wb_pc4_sel & ex_valid; 
     
         end
     // else: stall -> hold state (do nothing)
     end
     
 endmodule
-
