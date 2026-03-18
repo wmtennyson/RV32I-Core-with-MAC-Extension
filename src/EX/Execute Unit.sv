@@ -23,6 +23,7 @@ module Execute_Unit(
                       RS2_sel,
     input logic       OpA_sel,
                       OpB_sel,
+                      lui,
     
     // Execute Unit Output
     output logic [31:0] alu_out,        // ALU result
@@ -34,7 +35,9 @@ module Execute_Unit(
     logic [31:0] RS1,
                  RS2,
                  OpA,
-                 OpB;
+                 OpB,
+                 OpA_final;
+                 
     logic [3:0]  alu_ctrl;
     
     // Operand Selection Logic
@@ -80,6 +83,9 @@ module Execute_Unit(
             1'b1 : OpB = imm;
             default : OpB = RS2;
         endcase
+    
+        // Add a Special Case for LUI
+        OpA_final = lui ? 32'b0 : OpA; 
     end 
       
     // Instantiate ALU Control to Send to ALU
@@ -92,10 +98,11 @@ module Execute_Unit(
       
     // Instantiate the ALU for final ALU_Out      
     EXE_ALU ALU(
-        .OpA        (OpA),
+        .OpA        (OpA_final),
         .OpB        (OpB),
         .alu_ctrl   (alu_ctrl),
         .alu_out    (alu_out)
     );
   
 endmodule
+
