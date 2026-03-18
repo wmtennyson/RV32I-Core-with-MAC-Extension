@@ -12,6 +12,7 @@ module Control_Unit(
                  branch,
                  jump,
                  write_data,
+                 wb_pc4_sel,
                  OpA_sel,
                  OpB_sel,
                  lui,
@@ -26,7 +27,8 @@ module Control_Unit(
         mem_write =     1'b0; 
         branch =        1'b0; 
         jump =          1'b0; 
-        write_data =    1'b0; 
+        write_data =    1'b0;
+        wb_pc4_sel =    1'b0; 
         OpA_sel =       1'b0; 
         OpB_sel =       1'b0; 
         lui =           1'b0; 
@@ -80,6 +82,7 @@ module Control_Unit(
             7'b1101111, 7'b1100111: begin 
                 regwrite  = 1'b1;        
                 jump      = 1'b1;
+                wb_pc4_sel = 1'b1;
                 OpA_sel   = (opcode == 7'b1100111) ? 1 : 0;     // For JALR immediate offset
                 is_jalr   = (opcode == 7'b1100111) ? 1 : 0;     // JALR only
                 alu_op    = `JUMP;
