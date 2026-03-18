@@ -1,5 +1,5 @@
 `timescale 1ns / 1ps
-//`default_nettype none       // Disable Any Implicit Declarations (Debugging)
+`default_nettype none       // Disable Any Implicit Declarations (Debugging)
 
 module RV32I_Core(
   input  logic        clk,
@@ -52,7 +52,7 @@ module RV32I_Core(
         .if_pc_o            (if_pc),
         .if_pc_plus4_o      (if_pc4)
     );
-    
+        
     // ---------------------- IF/ID Interstage Register ----------------------
     // IF -> ID
     logic           id_instr_valid;
@@ -65,7 +65,7 @@ module RV32I_Core(
         .rst            (rst),
     
         // Inputs - Hazard and pipeline control
-        .stall          (id_stall),   // from Decode (Hazard Unit)
+        .stall          (id_stall),      // from Decode (Hazard Unit)
         .flush          (id_flush),   // from Decode (Branch taken)
     
         // Inputs - Data coming from Fetch Stage
@@ -84,6 +84,8 @@ module RV32I_Core(
     );
          
     // ---------------------- Instruction Decode Stage ----------------------
+    logic id_kill;
+    
     // WB -> ID Stage
     logic           id_we;
     logic [4:0]     id_rd;
@@ -108,6 +110,8 @@ module RV32I_Core(
     logic           mem_wb_regwrite_i;
     logic [31:0]    mem_wb_value_i;  
     
+    logic           halt_retire;
+    
     // ID -> ID/EX Stage
     logic [31:0]    id_ex_rs1_val_o,
                     id_ex_rs2_val_o,
@@ -127,6 +131,9 @@ module RV32I_Core(
                     id_ex_branch_o,
                     id_ex_jump_o,
                     id_ex_write_data_o,     // 1 = mem result, 0 = alu result
+                    ex_wb_pc4_sel_i,
+                    mem_wb_pc4_sel_i,
+                    id_wb_pc4_sel_o,
                     id_ex_lui_o,
                     id_ex_is_jalr_o;
     logic [2:0]     id_ex_alu_op_o;
@@ -161,18 +168,27 @@ module RV32I_Core(
         .id_ex_regwrite_i   (id_ex_regwrite_i),
         .id_ex_mem_read_i   (id_ex_mem_read_i),
         .ex_alu_out_i       (ex_alu_out_i),
+        .ex_mem_pc4_i       (mem_pc4_i),
+
         
         // Instruction currently in MEM stage (EX/MEM regs)     // TAKE FROM EX/MEM
-        .ex_mem_rd_i        (ex_mem_rd_i),                  // THIS DOES NOT EXIST 
+        .ex_mem_rd_i        (ex_mem_rd_i),                  
         .ex_mem_regwrite_i  (ex_mem_regwrite_i),
         .ex_mem_mem_read_i  (ex_mem_mem_read_i),
-        .ex_mem_alu_out_i   (ex_mem_alu_out_i),             // THIS DOES NOT EXIST
+        .ex_mem_alu_out_i   (ex_mem_alu_out_i),            
         
         // WB stage (MEM/WB regs)
         .mem_wb_rd_i        (mem_wb_rd_i),
         .mem_wb_regwrite_i  (mem_wb_regwrite_i),
         .mem_wb_value_i     (mem_wb_value_i),
         
+        // Various PC4 sel
+        .id_ex_wb_pc4_sel_i (ex_wb_pc4_sel_i),
+        .ex_mem_wb_pc4_sel_i(mem_wb_pc4_sel_i),
+        
+        // Kill
+        .kill_o             (id_kill),
+             
         // To Fetch (hazard / redirect)
         .stall_o            (id_stall),            
         .flush_o            (id_flush),             
@@ -180,32 +196,33 @@ module RV32I_Core(
         
         // Outputs
         // ID -> ID/EX pipeline(to Execute stage and beyond)
-        .rs1_val_o    (id_ex_rs1_val_o),
-        .rs2_val_o    (id_ex_rs2_val_o),
-        .imm_o        (id_ex_imm_o),
+        .rs1_val_o          (id_ex_rs1_val_o),
+        .rs2_val_o          (id_ex_rs2_val_o),
+        .imm_o              (id_ex_imm_o),
     
-        .rs1_o        (id_ex_rs1_o),
-        .rs2_o        (id_ex_rs2_o),
-        .rd_o         (id_ex_rd_o),
-        .funct3_o     (id_ex_funct3_o),
-        .funct7_o     (id_ex_funct7_o),
+        .rs1_o              (id_ex_rs1_o),
+        .rs2_o              (id_ex_rs2_o),
+        .rd_o               (id_ex_rd_o),
+        .funct3_o           (id_ex_funct3_o),
+        .funct7_o           (id_ex_funct7_o),
     
         // Control to later stages
-        .regwrite_o   (id_ex_regwrite_o),
-        .mem_read_o   (id_ex_mem_read_o),
-        .mem_write_o  (id_ex_mem_write_o),
-        .branch_o     (id_ex_branch_o),
-        .jump_o       (id_ex_jump_o),
-        .write_data_o (id_ex_write_data_o),  
-        .lui_o        (id_ex_lui_o),
-        .is_jalr_o    (id_ex_is_jalr_o),
-        .alu_op_o     (id_ex_alu_op_o),
+        .regwrite_o         (id_ex_regwrite_o),
+        .mem_read_o         (id_ex_mem_read_o),
+        .mem_write_o        (id_ex_mem_write_o),
+        .branch_o           (id_ex_branch_o),
+        .jump_o             (id_ex_jump_o),
+        .write_data_o       (id_ex_write_data_o),
+        .wb_pc4_sel_o       (id_wb_pc4_sel_o),  
+        .lui_o              (id_ex_lui_o),
+        .is_jalr_o          (id_ex_is_jalr_o),
+        .alu_op_o           (id_ex_alu_op_o),
     
         // Execute operand selects / forwarding selects
-        .opA_sel_o    (id_ex_opA_sel_o),    
-        .opB_sel_o    (id_ex_opB_sel_o),     
-        .rs1_sel_o    (ex_rs1_sel_i),   
-        .rs2_sel_o    (ex_rs2_sel_i)    
+        .opA_sel_o          (id_ex_opA_sel_o),    
+        .opB_sel_o          (id_ex_opB_sel_o),     
+        .rs1_sel_o          (ex_rs1_sel_i),   
+        .rs2_sel_o          (ex_rs2_sel_i)    
     );
     
     
@@ -249,7 +266,7 @@ module RV32I_Core(
         .rst                (rst),
 
         // Inputs
-        .flush_i            (id_stall),             // Bubble on stall
+        .flush_i            (id_kill || id_stall),             // Bubble on stall
         .stall_i            (1'b0),                 // optional (set 0 if unused)
         .instr_valid_i      (id_instr_valid && idex_issue_en),
         .instr_i            (id_instr),
@@ -274,6 +291,7 @@ module RV32I_Core(
         .branch_i           (id_ex_branch_o     & idex_issue_en),
         .jump_i             (id_ex_jump_o       & idex_issue_en),
         .write_data_i       (id_ex_write_data_o & idex_issue_en),
+        .wb_pc4_sel_i       (id_wb_pc4_sel_o    & idex_issue_en),
         .lui_i              (id_ex_lui_o        & idex_issue_en),
         .is_jalr_i          (id_ex_is_jalr_o    & idex_issue_en),
         .alu_op_i           (id_ex_alu_op_o),
@@ -304,6 +322,7 @@ module RV32I_Core(
         .id_ex_branch_o     (ex_branch_i),
         .id_ex_jump_o       (ex_jump_i),
         .id_ex_write_data_o (ex_write_data_i),
+        .id_ex_wb_pc4_sel_o (ex_wb_pc4_sel_i),
         .id_ex_lui_o        (ex_lui_i),
         .id_ex_is_jalr_o    (ex_is_jalr_i),
         .id_ex_alu_op_o     (ex_alu_op_i),
@@ -324,7 +343,7 @@ module RV32I_Core(
 
     
     Execute_Unit EU (
-        // Inputs
+        // Inputs 
         // Inputs for Operand A
         .PC             (ex_pc_i),
         .RS1_IDEXE      (ex_rs1_val_i),
@@ -347,6 +366,7 @@ module RV32I_Core(
         .RS2_sel        (ex_rs2_sel_i),
         .OpA_sel        (ex_opA_sel_i),
         .OpB_sel        (ex_opB_sel_i),   
+        .lui            (ex_lui_i),
         
         //Outputs
         // Execute Unit Output
@@ -371,7 +391,7 @@ module RV32I_Core(
     
     // WB control
     logic       mem_regwrite_i,
-                mem_write_data_i;       
+                mem_write_data_i;
     
     ex_mem_reg EX_MEM_REG (
         .clk                (clk),
@@ -380,7 +400,7 @@ module RV32I_Core(
         // Inputs
         // EX/MEM Pipeline Register - Inputs (from EX stage)
         .flush              (1'b0),     // optional (set 0 if unused)
-        .stall              (1'b0),     // optional (set 0 if unused)
+        .stall              (mem_wb_stall_req),     // optional (set 0 if unused)
         
         .ex_valid           (ex_valid_i),
         .ex_instr           (ex_instr_i),
@@ -399,6 +419,7 @@ module RV32I_Core(
         // WB control
         .ex_regwrite        (ex_regwrite_i),
         .ex_write_data      (ex_write_data_i),         // 1- Memory Result, 0 = alu result
+        .ex_wb_pc4_sel      (ex_wb_pc4_sel_i),
         
         // Outputs
         // EX/MEM Pipeline Register - Inputs (from EX stage)
@@ -418,7 +439,8 @@ module RV32I_Core(
         
         // WB control
         .ex_mem_regwrite    (mem_regwrite_i),
-        .ex_mem_write_data  (mem_write_data_i)
+        .ex_mem_write_data  (mem_write_data_i),
+        .ex_mem_wb_pc4_sel  (mem_wb_pc4_sel_i)
     );
     
     // ---------------------- Memory Stage ----------------------
@@ -456,20 +478,23 @@ module RV32I_Core(
     
    // Drive wrapper outputs
     assign dmem_wstrb = dmem_wstrb_int;
-    assign dmem_we    = dmem_req && (|dmem_wstrb_int);         // write when enabled and any byte strobe set
-    assign dmem_re    = dmem_req && (dmem_wstrb_int == 4'b0);  // read when enabled and no write strobes
+    assign dmem_we    = dmem_req && (|dmem_wstrb_int) && !halt_retire;         // write when enabled and any byte strobe set
+    assign dmem_re    = dmem_req && (dmem_wstrb_int == 4'b0) && !halt_retire;  // read when enabled and no write strobes
 
     
     // ---------------------- MEM/WB Interstage Register ----------------------
     // Outputs to WB stage
-    logic             wb_valid_i;
+    logic             wb_valid_i,
+                      wb_pc4_sel_i;
     logic [31:0]      wb_instr_i;
     logic [4:0]       wb_rd_i;
     logic             wb_regwrite_i,
                       wb_write_data_i;
     logic [31:0]      wb_alu_out_i;
     logic             wb_load_valid_i;
-    logic [31:0]      wb_load_data_i;
+    logic [31:0]      wb_load_data_i,
+                      wb_pc4_i;
+    logic             mem_wb_stall_req;
     
     mem_wb_reg MEM_WB_REG(
         .clk                   (clk),
@@ -486,6 +511,8 @@ module RV32I_Core(
         .ex_mem_regwrite_i      (mem_regwrite_i),
         .ex_mem_write_data_i    (mem_write_data_i), // 1=mem->wb, 0=alu->wb
         .ex_mem_alu_out_i       (mem_alu_out_i),
+        .ex_mem_pc4_i           (mem_pc4_i),          
+        .ex_mem_wb_pc4_sel_i    (mem_wb_pc4_sel_i),   
     
         // Inputs from mem_unit (formatted load result)
         .mem_load_valid_i       (mem_load_valid),
@@ -499,7 +526,11 @@ module RV32I_Core(
         .mem_wb_write_data_o    (wb_write_data_i),
         .mem_wb_alu_out_o       (wb_alu_out_i),
         .mem_wb_load_valid_o    (wb_load_valid_i),
-        .mem_wb_load_data_o     (wb_load_data_i)
+        .mem_wb_load_data_o     (wb_load_data_i),
+        .mem_wb_pc4_o           (wb_pc4_i),           
+        .mem_wb_wb_pc4_sel_o    (wb_pc4_sel_i),   
+        
+        .stall_req_o            (mem_wb_stall_req)
     );
     
     
@@ -525,6 +556,8 @@ module RV32I_Core(
         .mem_wb_alu_out     (wb_alu_out_i),
         .mem_wb_load_valid  (wb_load_valid_i),
         .mem_wb_load_data   (wb_load_data_i),
+        .mem_wb_pc4         (wb_pc4_i),          
+        .mem_wb_wb_pc4_sel  (wb_pc4_sel_i),
     
         // register file write port
         .rf_we              (rf_we),
@@ -541,7 +574,7 @@ module RV32I_Core(
 
     // ----------------------- Final Assignments to Tie up Loose Ends---------------
     // WB -> ID (Decode expects these names)
-    assign id_we    = rf_we;
+    assign id_we    = rf_we && !halt_retire;
     assign id_rd    = rf_waddr;
     assign id_wdata = rf_wdata;
 
@@ -657,26 +690,24 @@ module RV32I_Core(
     // Finally Check if The Instruction is legal or not
     assign wb_is_illegal = wb_valid_i && (wb_instr_i[1:0] == 2'b11) && !legal_rv32i(wb_instr_i);
     
+    assign halt_retire = done_o || trap_o || wb_is_ebreak || wb_is_ecall || wb_is_illegal;
+    
     // Registered outputs (latch once asserted, hold until reset) 
-    always_ff @(posedge clk or posedge rst) begin 
-        if (rst) begin 
-            done_o <= 1'b0; 
-            trap_o <= 1'b0; 
-        end 
-        else begin 
-            if (wb_is_illegal || wb_is_ecall) trap_o <= 1'b1;  // trap priority
-            else if (wb_is_ebreak)            done_o <= 1'b1;
-        end 
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst) begin
+            done_o <= 1'b0;
+            trap_o <= 1'b0;
+        end
+        else if (done_o || trap_o) begin
+            done_o <= done_o;
+            trap_o <= trap_o;
+        end
+        else if (wb_is_ebreak) begin
+            done_o <= 1'b1;
+        end
+        else if (wb_is_illegal || wb_is_ecall) begin
+            trap_o <= 1'b1;
+        end
     end
     
-    
-    // Debug to test trap:
-always_ff @(posedge clk) begin
-if (!rst && (wb_is_illegal || wb_is_ecall) && wb_valid_i) begin
-$display("TRAP SET @%0t: wb_instr=0x%08x opcode=0x%02x",
- $time, wb_instr_i, wb_instr_i[6:0]);
-end
-end 
-    
 endmodule
-
