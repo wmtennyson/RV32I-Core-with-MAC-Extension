@@ -12,88 +12,81 @@ module Forwarding_Unit(
                       MEM_WB_rd,            // MEM/WB Registers
     
     // Control Signals from Different Stages
-    input logic EX_MEM_RegWrite,            // Regwrite Signals
-                MEM_WB_RegWrite,
-                ID_EX_RegWrite,
-                ID_EX_mem_read,             // MemRead Signals
-                EX_MEM_mem_read,         
+    input logic     EX_MEM_RegWrite,            // Regwrite Signals
+                    MEM_WB_RegWrite,
+                    ID_EX_RegWrite,
+                    ID_EX_mem_read,             // MemRead Signals
+                    EX_MEM_mem_read,         
+   
+    // PC4 Selects for resolving JAL/JALR
+    input  logic     ID_EX_wb_pc4_sel,    
+    input  logic     EX_MEM_wb_pc4_sel,   
    
     // Outputs
+    output logic       BrFwd_A_use_pc4,     
+                       BrFwd_B_use_pc4,     
     output logic [1:0] BrFwd_A,
                        BrFwd_B,
                        RS1_Sel,
                        RS2_Sel
     );
     
-    // Variables - EX Forwarding Logic
-    logic ex_match_rs1, 
-          ex_match_rs2,
-          mem_match_rs1, 
-          mem_match_rs2;
-          
-    // Variables - ID Forwarding Logic
-    logic ex_alu_valid,       // EX result exists now (exclude loads)
-          exmem_alu_valid;    // EX/MEM has a usable value (exclude loads)
-
-    logic id_ex_match_br_rs1,       // ID/EX Branch Matches 
-          id_ex_match_br_rs2,
-          exmem_match_br_rs1,       // EX/MEM Branch Matches
-          exmem_match_br_rs2,
-          memwb_match_br_rs1,       // MEM/WB Branch Matches
-          memwb_match_br_rs2;
-
-    
-    // Begin Logic for the Forwarding Unit
     always_comb begin
-        
-        // Assign  a default 00 priority
-        BrFwd_A = 2'b00;  // 00=regfile, 01=from MEM/WB, 10=from EX/MEM, 11=from EX(alu_out)
+        // Defaults: no forwarding
+        BrFwd_A = 2'b00;
         BrFwd_B = 2'b00;
         RS1_Sel = 2'b00;
         RS2_Sel = 2'b00;
+        BrFwd_A_use_pc4 = 1'b0;
+        BrFwd_B_use_pc4 = 1'b0;
+
+        // EX-stage forwarding selects (for Execute_Unit)
+        // Encoding expected by Execute_Unit:
+        // 00 = ID/EX
+        // 01 = EX/MEM
+        // 10 = MEM/WB
+
+        // RS1 forward
+        if (EX_MEM_RegWrite && (EX_MEM_rd != 5'd0) && (EX_MEM_rd == ID_EX_rs1) && !EX_MEM_mem_read) begin
+            RS1_Sel = 2'b01; // from EX/MEM (ALU result)
+        end else if (MEM_WB_RegWrite && (MEM_WB_rd != 5'd0) && (MEM_WB_rd == ID_EX_rs1)) begin
+            RS1_Sel = 2'b10; // from MEM/WB (WB value)
+        end
+
+        // RS2 forward  ***CRITICAL FOR STORES***
+        // stores still use RS2 as store_data.
+        if (EX_MEM_RegWrite && (EX_MEM_rd != 5'd0) && (EX_MEM_rd == ID_EX_rs2) && !EX_MEM_mem_read) begin
+            RS2_Sel = 2'b01; // from EX/MEM (ALU result)
+        end else if (MEM_WB_RegWrite && (MEM_WB_rd != 5'd0) && (MEM_WB_rd == ID_EX_rs2)) begin
+            RS2_Sel = 2'b10; // from MEM/WB (WB value)
+        end
+
+        // ID-stage branch compare forwarding (for Branch_Unit operands)
+        // Decode_Unit expects:
+        // 00 = regfile
+        // 01 = MEM/WB value
+        // 10 = EX/MEM alu_out
+        // 11 = EX alu_out
         
-        // EX forwarding logic - Compute Conditions
-        //-------------------------------------------
-        ex_match_rs1  = EX_MEM_RegWrite && (EX_MEM_rd != 5'd0) && (EX_MEM_rd == ID_EX_rs1);
-        ex_match_rs2  = EX_MEM_RegWrite && (EX_MEM_rd != 5'd0) && (EX_MEM_rd == ID_EX_rs2);
-         
-        mem_match_rs1 = MEM_WB_RegWrite && (MEM_WB_rd != 5'd0) && (MEM_WB_rd == ID_EX_rs1);
-        mem_match_rs2 = MEM_WB_RegWrite && (MEM_WB_rd != 5'd0) && (MEM_WB_rd == ID_EX_rs2);
-        
-        // RS1 forwarding priority: EX/MEM > MEM/WB
-        if (ex_match_rs1)       RS1_Sel = 2'b10;
-        else if (mem_match_rs1) RS1_Sel = 2'b01;
-        
-        // RS2 forwarding priority: EX/MEM > MEM/WB
-        if (ex_match_rs2)       RS2_Sel = 2'b10;
-        else if (mem_match_rs2) RS2_Sel = 2'b01;
-        
-        // ID (Branch) Forwarding Logic - Compute Conditions
-        //--------------------------------------------
-        // Valid when ALU computes a value and writes to Register (Load Automatically Invalid)
-        ex_alu_valid    = ID_EX_RegWrite && !ID_EX_mem_read;
+        // rs1 for branch
+        if (ID_EX_RegWrite && (ID_EX_rd != 5'd0) && (ID_EX_rd == IF_ID_rs1) && !ID_EX_mem_read && !ID_EX_wb_pc4_sel) begin   
+            BrFwd_A = 2'b11;    // from EX stage ALU out
+        end else if (EX_MEM_RegWrite && (EX_MEM_rd != 5'd0) && (EX_MEM_rd == IF_ID_rs1) && !EX_MEM_mem_read) begin
+            BrFwd_A = 2'b10;    // from MEM stage ALU out
+            BrFwd_A_use_pc4  = EX_MEM_wb_pc4_sel; 
+        end else if (MEM_WB_RegWrite && (MEM_WB_rd != 5'd0) && (MEM_WB_rd == IF_ID_rs1)) begin
+            BrFwd_A = 2'b01;    // from WB value
+        end 
 
-        // Only claim EX/MEM has a usable value for branch compare if it's NOT a load.
-        exmem_alu_valid = EX_MEM_RegWrite && !EX_MEM_mem_read;
-
-        // Match checks for IF/ID.rs1
-        id_ex_match_br_rs1  = ex_alu_valid    && (ID_EX_rd  != 5'd0) && (ID_EX_rd  == IF_ID_rs1);
-        exmem_match_br_rs1  = exmem_alu_valid && (EX_MEM_rd != 5'd0) && (EX_MEM_rd == IF_ID_rs1);
-        memwb_match_br_rs1  = MEM_WB_RegWrite && (MEM_WB_rd != 5'd0) && (MEM_WB_rd == IF_ID_rs1);
-
-        // Match checks for IF/ID.rs2
-        id_ex_match_br_rs2  = ex_alu_valid    && (ID_EX_rd  != 5'd0) && (ID_EX_rd  == IF_ID_rs2);
-        exmem_match_br_rs2  = exmem_alu_valid && (EX_MEM_rd != 5'd0) && (EX_MEM_rd == IF_ID_rs2);
-        memwb_match_br_rs2  = MEM_WB_RegWrite && (MEM_WB_rd != 5'd0) && (MEM_WB_rd == IF_ID_rs2);
-
-        // Priority: EX (11) > EX/MEM (10) > MEM/WB (01) > Regfile (00)
-        if (id_ex_match_br_rs1)        BrFwd_A = 2'b11;
-        else if (exmem_match_br_rs1)   BrFwd_A = 2'b10;
-        else if (memwb_match_br_rs1)   BrFwd_A = 2'b01;
-
-        if (id_ex_match_br_rs2)        BrFwd_B = 2'b11;
-        else if (exmem_match_br_rs2)   BrFwd_B = 2'b10;
-        else if (memwb_match_br_rs2)   BrFwd_B = 2'b01;
+        // rs2 for branch
+        if (ID_EX_RegWrite && (ID_EX_rd != 5'd0) && (ID_EX_rd == IF_ID_rs2) && !ID_EX_mem_read && !ID_EX_wb_pc4_sel) begin   
+            BrFwd_B = 2'b11;
+        end else if (EX_MEM_RegWrite && (EX_MEM_rd != 5'd0) && (EX_MEM_rd == IF_ID_rs2) && !EX_MEM_mem_read) begin
+            BrFwd_B = 2'b10;
+            BrFwd_B_use_pc4  = EX_MEM_wb_pc4_sel;
+        end else if (MEM_WB_RegWrite && (MEM_WB_rd != 5'd0) && (MEM_WB_rd == IF_ID_rs2)) begin
+            BrFwd_B = 2'b01;
+        end
     end
-    
-endmodule 
+
+endmodule
