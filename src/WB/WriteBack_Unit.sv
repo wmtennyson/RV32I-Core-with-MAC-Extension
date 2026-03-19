@@ -1,54 +1,48 @@
 `timescale 1ns / 1ps
 
-module writeback_unit (
+module WriteBack_Unit (
+    // From MEM/WB register
+    input  logic        valid_i,
+    input  logic [4:0]  rd_i,
+    input  logic        regwrite_i,
+    input  logic        wb_sel_i,       // 0=ALU, 1=memory
+    input  logic        wb_pc4_sel_i,   // 1=PC+4 (JAL/JALR link)
+    input  logic [31:0] alu_out_i,
+    input  logic        load_valid_i,
+    input  logic [31:0] load_data_i,
+    input  logic [31:0] pc4_i,
 
-    // from mem/wb pipeline register
-    input  logic        mem_wb_valid,
-    input  logic [4:0]  mem_wb_rd,
-    input  logic        mem_wb_regwrite,
-    input  logic        mem_wb_write_data,   // 1 = memory result, 0 = alu result
-    input  logic [31:0] mem_wb_alu_out,
-    input  logic        mem_wb_load_valid,
-    input  logic [31:0] mem_wb_load_data,
-    
-    input  logic [31:0] mem_wb_pc4,            // NEW
-    input  logic        mem_wb_wb_pc4_sel,
+    // Register file write port
+    output logic        rf_we_o,
+    output logic [4:0]  rf_waddr_o,
+    output logic [31:0] rf_wdata_o,
 
-    // register file write port
-    output logic        rf_we,
-    output logic [4:0]  rf_waddr,
-    output logic [31:0] rf_wdata,
-
-    // writeback stage outputs (forwarding / debug visibility)
-    output logic        wb_valid,
-    output logic        wb_regwrite_eff,     // regwrite after gating
-    output logic [4:0]  wb_rd,
-    output logic [31:0] wb_value
+    // Forwarding / debug outputs
+    output logic        wb_valid_o,
+    output logic        wb_regwrite_o,
+    output logic [4:0]  wb_rd_o,
+    output logic [31:0] wb_value_o
 );
 
     always_comb begin
-        wb_valid = mem_wb_valid;
-        wb_rd    = mem_wb_rd;
+        wb_valid_o = valid_i;
+        wb_rd_o    = rd_i;
 
-        // NEW: PC4 has highest priority
-        if (mem_wb_wb_pc4_sel) begin
-            wb_value = mem_wb_pc4;
-        end else begin
-            wb_value = mem_wb_write_data ? mem_wb_load_data : mem_wb_alu_out;
-        end
+        // Data selection: PC+4 > MEM > ALU
+        if (wb_pc4_sel_i)
+            wb_value_o = pc4_i;
+        else if (wb_sel_i)
+            wb_value_o = load_data_i;
+        else
+            wb_value_o = alu_out_i;
 
-        // NEW: allow regwrite even if load_valid is 0 when selecting PC4 or ALU
-        wb_regwrite_eff = mem_wb_valid
-                       && mem_wb_regwrite
-                       && (mem_wb_rd != 5'd0)
-                       && ( mem_wb_wb_pc4_sel
-                            || !mem_wb_write_data
-                            || mem_wb_load_valid );
+        // Gate regwrite: valid && regwrite && rd!=x0 &&
+        wb_regwrite_o = valid_i && regwrite_i && (rd_i != 5'd0)
+                     && (wb_pc4_sel_i || !wb_sel_i || load_valid_i);
 
-        rf_we    = wb_regwrite_eff;
-        rf_waddr = mem_wb_rd;
-        rf_wdata = wb_value;
+        rf_we_o    = wb_regwrite_o;
+        rf_waddr_o = rd_i;
+        rf_wdata_o = wb_value_o;
     end
 
 endmodule
-
