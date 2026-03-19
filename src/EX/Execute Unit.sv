@@ -1,108 +1,78 @@
 `timescale 1ns / 1ps
 
-module Execute_Unit(
-    // Inputs for Operand A
-    input logic [31:0] PC,
-                       RS1_IDEXE,
-                       RS1_EXEMEM,
-                       RS1_MEMWB,
-    
-    // Inputs for Operand B
-    input  logic [31:0] RS2_IDEXE,
-                        RS2_EXEMEM,
-                        RS2_MEMWB,
-                        imm,
-    
-    // Inputs for ALU Control Unit
-    input logic [2:0]   func3,
-    input logic [6:0]   func7,
-    input logic [2:0]   alu_op,
-    
-    // Control Signals for Muxltiplexers
-    input logic [1:0] RS1_sel,
-                      RS2_sel,
-    input logic       OpA_sel,
-                      OpB_sel,
-                      lui,
-    
-    // Execute Unit Output
-    output logic [31:0] alu_out,        // ALU result
-                        store_data      // Forwarded rs2 for lw/sw ops
-   
-    );
-    
-    // Variables
-    logic [31:0] RS1,
-                 RS2,
-                 OpA,
-                 OpB,
-                 OpA_final;
-                 
-    logic [3:0]  alu_ctrl;
-    
-    // Operand Selection Logic
+module Execute_Unit (
+    // From ID/EX register
+    input  logic [31:0] pc_i,
+    input  logic [31:0] rs1_val_i,
+    input  logic [31:0] rs2_val_i,
+    input  logic [31:0] imm_i,
+    input  logic [2:0]  funct3_i,
+    input  logic [6:0]  funct7_i,
+    input  logic [2:0]  alu_op_i,
+
+    // Operand select controls (from ID/EX register)
+    input  logic        opA_sel_i,   // 0=PC, 1=RS1
+    input  logic        opB_sel_i,   // 0=RS2, 1=IMM
+    input  logic        lui_i,
+
+    // Forwarding selects (from Forwarding_Unit, combinational)
+    //   00=ID/EX value, 01=MEM forward, 10=WB forward
+    input  logic [1:0]  fwd_a_i,
+    input  logic [1:0]  fwd_b_i,
+
+    // Forwarded values
+    input  logic [31:0] mem_fwd_i,   // from EX/MEM (ALU result or PC+4)
+    input  logic [31:0] wb_fwd_i,    // from MEM/WB (writeback value)
+
+    // Outputs
+    output logic [31:0] alu_out_o,
+    output logic [31:0] store_data_o   // forwarded RS2 for stores
+);
+
+    // Layer 1: Forwarding muxes
+    logic [31:0] rs1_fwd, rs2_fwd;
+
     always_comb begin
-    
-        // Safe defaults (no forwarding, normal operand usage)
-        RS1        = RS1_IDEXE;
-        RS2        = RS2_IDEXE;
-        OpA        = RS1_IDEXE;
-        OpB        = RS2_IDEXE;
-        store_data = RS2_IDEXE;
-            
-        // First-Layer Forwarding Multiplexers - Inputs from Multiplexer for RS1 and RS2
-        // Select the Input for RS1_Sel Mux
-        unique case(RS1_sel)
-            2'b00 : RS1 = RS1_IDEXE;
-            2'b01 : RS1 = RS1_EXEMEM;
-            2'b10 : RS1 = RS1_MEMWB;
-            default : RS1 = RS1_IDEXE;
+        unique case (fwd_a_i)
+            2'b01:   rs1_fwd = mem_fwd_i;
+            2'b10:   rs1_fwd = wb_fwd_i;
+            default: rs1_fwd = rs1_val_i;
         endcase
-        
-        // Select the Input for RS2_Sel Mux
-        unique case(RS2_sel)
-            2'b00 : RS2 = RS2_IDEXE;
-            2'b01 : RS2 = RS2_EXEMEM;
-            2'b10 : RS2 = RS2_MEMWB;
-            default : RS2 = RS2_IDEXE;
+
+        unique case (fwd_b_i)
+            2'b01:   rs2_fwd = mem_fwd_i;
+            2'b10:   rs2_fwd = wb_fwd_i;
+            default: rs2_fwd = rs2_val_i;
         endcase
-        
-        store_data = RS2;
-        
-        // Second-Layer Operand Multiplexers - Input from Multiplexer for OpA and OpB
-        // Select the Input for OpA_Sel Mux
-        unique case(OpA_sel)
-            1'b0 : OpA = PC;
-            1'b1 : OpA = RS1;
-            default : OpA = RS1;
-        endcase
-        
-        // Select the Input for OpB_Sel Mux
-        unique case(OpB_sel)
-            1'b0 : OpB = RS2;
-            1'b1 : OpB = imm;
-            default : OpB = RS2;
-        endcase
-    
-        // Add a Special Case for LUI
-        OpA_final = lui ? 32'b0 : OpA; 
-    end 
-      
-    // Instantiate ALU Control to Send to ALU
-    EXE_Control ALU_ctrl(
-        .func3      (func3),
-        .func7      (func7),
-        .alu_op     (alu_op),
+    end
+
+    assign store_data_o = rs2_fwd;
+
+    // Layer 2: Operand selection for ALU
+    logic [31:0] OpA, OpB;
+
+    always_comb begin
+        OpA = opA_sel_i ? rs1_fwd : pc_i;
+        if (lui_i) OpA = 32'd0;              // LUI: 0 + imm
+        OpB = opB_sel_i ? imm_i   : rs2_fwd;
+    end
+
+    // ALU control decoder
+    logic [3:0] alu_ctrl;
+
+    EXE_Control CTRL (
+        .alu_op     (alu_op_i), 
+        .func7      (funct7_i), 
+        .func3      (funct3_i),
         .alu_ctrl   (alu_ctrl)
     );
-      
-    // Instantiate the ALU for final ALU_Out      
-    EXE_ALU ALU(
-        .OpA        (OpA_final),
-        .OpB        (OpB),
-        .alu_ctrl   (alu_ctrl),
-        .alu_out    (alu_out)
-    );
-  
-endmodule
 
+    // ALU
+    EXE_ALU ALU (
+        .OpA        (OpA), 
+        .OpB        (OpB), 
+        .alu_ctrl   (alu_ctrl),
+        .alu_out    (alu_out_o)
+    );
+
+endmodule
