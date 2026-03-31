@@ -72,3 +72,5 @@ module Hazard_Unit (
     assign stall_o = hz_load_use | hz_mem_load_branch | hz_pc4_link;
 
 endmodule
+
+
