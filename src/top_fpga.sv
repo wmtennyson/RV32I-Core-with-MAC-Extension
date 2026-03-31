@@ -71,7 +71,7 @@ module top_fpga #(
     // Strings in .text are read via the data path; without it, reads return 0 and uart_puts exits immediately
     (* ram_style = "block" *) logic [31:0] boot_rom [0:BOOT_ROM_WORDS-1];
     initial begin
-        $readmemh("D:/Vivado/senior_proj_components/senior_proj_components.srcs/sources_1/imports/bootloader/bootloader.mem", boot_rom);
+        $readmemh("bootloader.mem", boot_rom);
     end
 
     // Port A: instruction fetch
