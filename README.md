@@ -1,4 +1,4 @@
-# Senior Project — 2025
+# RV32I Core with MAC Extension
 
 A 5-stage pipelined RV32I processor designed in SystemVerilog, targeting DSP applications. The core runs on a Digilent Arty A7 FPGA with a UART bootloader for loading and executing compiled C programs over serial.
 
