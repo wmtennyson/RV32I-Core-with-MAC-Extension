@@ -7,7 +7,7 @@ A lightweight UART bootloader and upload toolchain for loading and running compi
 ## Directory Structure
 
 ```
-minimal_rv32i_loader/
+/scripts/rv32i_loader/
 ├── sw/
 │   ├── bootloader/          Bootloader firmware (runs from boot ROM)
 │   │   ├── boot_crt0.S       Startup assembly (sets stack, calls boot_main)
@@ -24,13 +24,9 @@ minimal_rv32i_loader/
 │       ├── app.bin            Pre-built binary ready to upload
 │       ├── app.elf            ELF with debug symbols
 │       └── Makefile
-├── tools/
-│   ├── send_bin.py            Sends a binary to the FPGA over UART
-│   ├── send_and_monitor.py    Sends binary + stays open as serial monitor
-│   └── bin_to_mem.py          Converts .bin to Verilog $readmemh format
-├── top_fpga_template.xdc      Pin constraints for Arty A7
-├── README.md
-└── ATTRIBUTION.md
+└── tools/
+    ├── send_bin.py            Sends a binary to the FPGA over UART + Stays open as serial monitor
+    └── bin_to_mem.py          Converts .bin to Verilog $readmemh format
 ```
 
 ---
