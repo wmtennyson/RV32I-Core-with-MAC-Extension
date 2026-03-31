@@ -1,5 +1,4 @@
 `timescale 1ns / 1ps
-`default_nettype none
 
 module RV32I_Core (
     input  logic        clk,
