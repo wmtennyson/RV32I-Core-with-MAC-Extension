@@ -25,47 +25,6 @@ MAC (multiply-accumulate) extensions for DSP workloads are planned.
 | `0x4000_0000`  | UART Data    | Write = TX byte, Read = RX byte     |
 | `0x4000_0004`  | UART Status  | bit 0 = rx_valid, bit 1 = tx_ready  |
 
-## Project Structure
-
-```
-sources_1/
-├── RV32I_Core.sv              Top-level CPU module
-├── IF/
-│   └── fetch_unit.sv          Instruction fetch + PC management
-├── ID/
-│   ├── Decode_Unit.sv         Decode, register file, branch resolution
-│   ├── Control_Unit.sv        Opcode decoder
-│   ├── Branch_Unit.sv         Branch/jump comparator and target calc
-│   ├── Forwarding_Unit.sv     Data hazard forwarding logic
-│   ├── Hazard_Unit.sv         Stall detection
-│   ├── ImmGen.sv              Immediate generator (I/S/B/U/J)
-│   └── regfile.sv             32x32 register file
-├── EX/
-│   ├── Execute_Unit.sv        ALU + operand selection + forwarding muxes
-│   ├── EXE_ALU.sv             Arithmetic/logic unit
-│   └── EXE_Control.sv         ALU control decoder
-├── MEM/
-│   └── mem_unit.sv            Load/store unit with byte/half/word support
-├── WB/
-│   └── WriteBack_Unit.sv      Writeback mux (ALU / memory / PC+4)
-├── Interstage/
-│   ├── if_id_reg.sv           IF/ID pipeline register
-│   ├── id_ex_reg.sv           ID/EX pipeline register
-│   ├── ex_mem_reg.sv          EX/MEM pipeline register
-│   └── mem_wb_reg.sv          MEM/WB pipeline register
-├── imports/
-│   ├── rtl/
-│   │   ├── top_fpga.sv        SoC top level (CPU + memory + UART + PLL)
-│   │   ├── simple_uart_rx.sv  UART receiver
-│   │   └── simple_uart_tx.sv  UART transmitter
-│   └── bootloader/
-│       └── bootloader.mem     Bootloader ROM image
-├── new/
-│   └── Def.vh                 Shared macro definitions (ALU ops, opcodes)
-sim_1/                         Testbenches
-constrs_1/                     XDC pin constraints for Arty A7
-```
-
 ## Getting Started
 
 ### Prerequisites
@@ -117,6 +76,17 @@ See [HOW_TO_GUIDE.md](HOW_TO_GUIDE.md) for detailed setup instructions, troubles
 - [x] FPGA deployment on Arty A7 at 50 MHz
 - [ ] MAC (multiply-accumulate) instruction extensions for DSP
 - [ ] DSP application demo
+
+## Attributions
+This starter package was developed specifically for this RV32I project and is not a verbatim copy of any external repository.
+
+The UART upload protocol and host-side binary transmission flow were inspired by the RudolV project by bobbl, which outlines a simple UART bootloader process that sends the image length followed by the binary payload.
+
+The bare-metal startup code and linker layout draw inspiration from the RISC-V Scratchpad examples by five-embeddev, particularly their minimal startup and linker organization.
+
+The approach of keeping the first downloadable application extremely small was informed by minimal bare-metal examples such as krakenlake/riscv-hello-uart.
+
+All files have been simplified and rewritten to align with a specific memory map, a custom Verilog core interface, and a raw binary loader workflow.
 
 ## License
 
