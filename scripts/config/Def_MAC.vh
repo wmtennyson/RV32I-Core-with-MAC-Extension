@@ -26,12 +26,11 @@
 `define OP_LOAD         3'b110          // LW, LH, LB, LHU, LBU
 `define OP_NOP          3'b111          // No operation
 
-// MAC Unit Operation Codes and Associated Definitions
-`define MAC_OP_NONE     3'b000
-`define MAC_OP_MAC      3'b001
-`define MAC_OP_MACCLR   3'b010
-`define MAC_OP_RDLO     3'b011
-`define MAC_OP_RDHI     3'b100
+// MAC Unit func3 Operation Codes and Associated Definitions
+`define MAC_OP_MAC      3'b001          // acc64 += fx_mul(rs1, rs2)
+`define MAC_OP_MACCLR   3'b010          // Clear the MAC Unit
+`define MAC_OP_RDLO     3'b010          // rd = acc64[31:0]
+`define MAC_OP_RDHI     3'b011          // rd = acc64[63:32]
 
 // Custom-0 opcode for MAC extension
 `define OP_CUSTOM0      7'b0001011
