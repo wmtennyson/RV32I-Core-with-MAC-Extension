@@ -27,14 +27,14 @@
 `define OP_NOP          3'b111          // No operation
 
 // MAC Unit func3 Operation Codes and Associated Definitions
-`define MAC_OP_NOP      3'b000          // MAC unit Nop
-`define MAC_OP_MAC      3'b001          // acc64 += fx_mul(rs1, rs2)
-`define MAC_OP_MACCLR   3'b010          // Clear the MAC Unit
+`define MAC_OP_MAC      3'b000          // acc64 += fx_mul(rs1, rs2)
+`define MAC_OP_MACCLR   3'b001          // Clear the MAC Unit
 `define MAC_OP_RDLO     3'b010          // rd = acc64[31:0]
 `define MAC_OP_RDHI     3'b011          // rd = acc64[63:32]
+`define MAC_OP_NOP      3'b111          // MAC unit Nop
 
 // Custom-0 opcode for MAC extension
-`define OP_CUSTOM0      7'b0001011
+`define MAC_OPCODE      7'b0001011
 
 // Fixed-point fractional bits (Q16.16 default)
 `define MAC_FRAC_BITS  16
