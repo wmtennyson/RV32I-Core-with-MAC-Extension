@@ -27,6 +27,7 @@
 `define OP_NOP          3'b111          // No operation
 
 // MAC Unit func3 Operation Codes and Associated Definitions
+`define MAC_OP_NOP      3'b000          // MAC unit Nop
 `define MAC_OP_MAC      3'b001          // acc64 += fx_mul(rs1, rs2)
 `define MAC_OP_MACCLR   3'b010          // Clear the MAC Unit
 `define MAC_OP_RDLO     3'b010          // rd = acc64[31:0]
