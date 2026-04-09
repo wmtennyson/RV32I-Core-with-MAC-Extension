@@ -21,8 +21,10 @@ module Decode_Unit (
     input  logic        id_ex_regwrite_i,
     input  logic        id_ex_wb_pc4_sel_i,
     input  logic [4:0]  id_ex_rd_i,
+    input  logic [2:0]  id_ex_MAC_op_i,
     input  logic        ex_mem_mem_read_i,
     input  logic [4:0]  ex_mem_rd_i,
+    input  logic [2:0]  ex_mem_MAC_op_i,
 
     // Branch-compare forwarding (from Forwarding_Unit at top level)
     input  logic [1:0]  br_fwd_a_i,
@@ -168,8 +170,10 @@ module Decode_Unit (
         .id_ex_regwrite_i       (id_ex_regwrite_i),
         .id_ex_wb_pc4_sel_i     (id_ex_wb_pc4_sel_i), 
         .id_ex_rd_i             (id_ex_rd_i),
+        .id_ex_MAC_op_i         (id_ex_MAC_op_i),
         .ex_mem_mem_read_i      (ex_mem_mem_read_i), 
         .ex_mem_rd_i            (ex_mem_rd_i),
+        .ex_mem_MAC_op_i        (ex_mem_MAC_op_i),
         .stall_o                (stall_hz)
     );
 
@@ -279,4 +283,5 @@ module Decode_Unit (
     end
 
 endmodule
+
 
