@@ -1,6 +1,7 @@
 `include "Def.vh"
 `timescale 1ns / 1ps
 
+(* use_dsp = "yes" *)
 module MAC_Unit #(
     parameter int FRAC_BITS = `MAC_FRAC_BITS
 )(
