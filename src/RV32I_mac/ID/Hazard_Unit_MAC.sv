@@ -12,10 +12,12 @@ module Hazard_Unit (
     input  logic        id_ex_regwrite_i,
     input  logic        id_ex_wb_pc4_sel_i,  // JAL/JALR in EX writes PC+4
     input  logic [4:0]  id_ex_rd_i,
+    input  logic [2:0]  id_ex_MAC_op_i,
 
     // Instruction in MEM stage (EX/MEM register)
     input  logic        ex_mem_mem_read_i,
     input  logic [4:0]  ex_mem_rd_i,
+    input  logic [2:0]  ex_mem_MAC_op_i,
 
     output logic        stall_o
 );
@@ -44,6 +46,13 @@ module Hazard_Unit (
     assign needs_id_operands = instr_valid_i &&
                                ((opcode_i == 7'b1100011) ||   // Branch
                                 (opcode_i == 7'b1100111));     // JALR
+                                
+    // Producer-is-MAC-read flags
+    logic id_ex_is_macrd, ex_mem_is_macrd;
+    assign id_ex_is_macrd  = (id_ex_MAC_op_i  == `MAC_OP_RDLO) ||
+                             (id_ex_MAC_op_i  == `MAC_OP_RDHI);
+    assign ex_mem_is_macrd = (ex_mem_MAC_op_i == `MAC_OP_RDLO) ||
+                             (ex_mem_MAC_op_i == `MAC_OP_RDHI);
 
     // Hazard 1: Classic load-use
     logic hz_load_use;
@@ -70,7 +79,28 @@ module Hazard_Unit (
                       && ((uses_rs1 && (id_ex_rd_i == rs1_i)) ||
                           (uses_rs2 && (id_ex_rd_i == rs2_i)));
 
-    assign stall_o = hz_load_use | hz_mem_load_branch | hz_pc4_link;
+    // Hazard 4: MAC-read-use, EX-stage producer
+    logic hz_macrd_use_ex;
+    assign hz_macrd_use_ex = instr_valid_i
+                          && id_ex_is_macrd
+                          && (id_ex_rd_i != 5'd0)
+                          && ((uses_rs1 && (id_ex_rd_i == rs1_i)) ||
+                              (uses_rs2 && (id_ex_rd_i == rs2_i)));
+
+    // Hazard 5: MAC-read-use, MEM-stage producer
+    logic hz_macrd_use_mem;
+    assign hz_macrd_use_mem = instr_valid_i
+                           && ex_mem_is_macrd
+                           && (ex_mem_rd_i != 5'd0)
+                           && ((uses_rs1 && (ex_mem_rd_i == rs1_i)) ||
+                               (uses_rs2 && (ex_mem_rd_i == rs2_i)));
+
+    assign stall_o = hz_load_use
+                   | hz_mem_load_branch
+                   | hz_pc4_link
+                   | hz_macrd_use_ex
+                   | hz_macrd_use_mem;
 
 endmodule
+
 
