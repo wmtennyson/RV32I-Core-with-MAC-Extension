@@ -25,17 +25,28 @@ module top_fpga #(
 
     logic rst_int;
     (* shreg_extract = "no" *) logic [2:0] rst_sync = 3'b111;
+    logic [63:0] cycle_ctr;
 
     always_ff @(posedge clk_50) begin
+        // Reset synchronizer
         rst_sync <= {rst_sync[1:0], ~pll_locked | ~rst};
+
+        // Free-running cycle counter
+        if (rst_int)
+            cycle_ctr <= 64'd0;
+        else
+            cycle_ctr <= cycle_ctr + 64'd1;
     end
+
     assign rst_int = rst_sync[2];
 
-    localparam logic [31:0] NOP       = 32'h0000_0013;
-    localparam logic [31:0] BOOT_BASE = 32'h0000_0000;
-    localparam logic [31:0] RAM_BASE  = 32'h2000_0000;
-    localparam logic [31:0] RAM_BYTES = RAM_WORDS * 4;
-    localparam logic [31:0] UART_BASE = 32'h4000_0000;
+    localparam logic [31:0] NOP           = 32'h0000_0013;
+    localparam logic [31:0] BOOT_BASE     = 32'h0000_0000;
+    localparam logic [31:0] RAM_BASE      = 32'h2000_0000;
+    localparam logic [31:0] RAM_BYTES     = RAM_WORDS * 4;
+    localparam logic [31:0] UART_BASE     = 32'h4000_0000;
+    localparam logic [31:0] CYCLE_LO_ADDR = 32'h4000_0008;
+    localparam logic [31:0] CYCLE_HI_ADDR = 32'h4000_000C;
 
     logic [31:0] imem_addr;
     logic        imem_en;
@@ -71,7 +82,7 @@ module top_fpga #(
     // Strings in .text are read via the data path; without it, reads return 0 and uart_puts exits immediately
     (* ram_style = "block" *) logic [31:0] boot_rom [0:BOOT_ROM_WORDS-1];
     initial begin
-        $readmemh("bootloader.mem", boot_rom);
+        $readmemh("D:/Vivado/senior_proj_components/senior_proj_components.srcs/sources_1/imports/bootloader/bootloader.mem", boot_rom);
     end
 
     // Port A: instruction fetch
@@ -131,6 +142,14 @@ module top_fpga #(
         is_uart_status_addr = (addr == (UART_BASE + 32'h4));
     endfunction
 
+    function automatic logic is_cycle_lo_addr(input logic [31:0] addr);
+        is_cycle_lo_addr = (addr == CYCLE_LO_ADDR);
+    endfunction
+
+    function automatic logic is_cycle_hi_addr(input logic [31:0] addr);
+        is_cycle_hi_addr = (addr == CYCLE_HI_ADDR);
+    endfunction
+
     // Instruction fetch output mux
     logic imem_was_boot, imem_was_ram;
 
@@ -188,26 +207,27 @@ module top_fpga #(
     // Data memory control
     logic        dmem_re_q;
     logic [31:0] dmem_addr_q;
+    logic [31:0] cycle_rdata_q;
 
     always_ff @(posedge clk_50) begin
         if (rst_int) begin
-            dmem_re_q    <= 1'b0;
-            dmem_addr_q  <= 32'd0;
-            uart_rx_hold <= 8'd0;
-            uart_rx_valid<= 1'b0;
-            uart_tx_start<= 1'b0;
-            uart_tx_data <= 8'd0;
+            dmem_re_q     <= 1'b0;
+            dmem_addr_q   <= 32'd0;
+            uart_rx_hold  <= 8'd0;
+            uart_rx_valid <= 1'b0;
+            uart_tx_start <= 1'b0;
+            uart_tx_data  <= 8'd0;
         end else begin
             uart_tx_start <= 1'b0;
 
             dmem_re_q <= dmem_re;
             if (dmem_re)
                 dmem_addr_q <= dmem_addr;
-            
+
             // Clear rx_valid when CPU reads the data register
             if (dmem_re && is_uart_data_addr(dmem_addr) && uart_rx_valid)
                 uart_rx_valid <= 1'b0;
-                
+
             // Sticky RX register
             if (uart_rx_pulse) begin
                 uart_rx_hold  <= uart_rx_data;
@@ -218,6 +238,18 @@ module top_fpga #(
                 uart_tx_data  <= dmem_wdata[7:0];
                 uart_tx_start <= 1'b1;
             end
+        end
+    end
+
+    // Registered cycle counter read data (same 1-cycle read behavior as other DMEM reads)
+    always_ff @(posedge clk_50) begin
+        if (rst_int) begin
+            cycle_rdata_q <= 32'd0;
+        end else if (dmem_re) begin
+            if (is_cycle_lo_addr(dmem_addr))
+                cycle_rdata_q <= cycle_ctr[31:0];
+            else if (is_cycle_hi_addr(dmem_addr))
+                cycle_rdata_q <= cycle_ctr[63:32];
         end
     end
 
@@ -233,6 +265,8 @@ module top_fpga #(
                 dmem_rdata = {24'h0, uart_rx_hold};
             else if (is_uart_status_addr(dmem_addr_q))
                 dmem_rdata = {30'h0, uart_tx_ready, uart_rx_valid};
+            else if (is_cycle_lo_addr(dmem_addr_q) || is_cycle_hi_addr(dmem_addr_q))
+                dmem_rdata = cycle_rdata_q;
         end
     end
 
