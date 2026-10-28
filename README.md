@@ -74,8 +74,8 @@ See [HOW_TO_GUIDE.md](HOW_TO_GUIDE.md) for detailed setup instructions, troubles
 - [x] 5-stage pipeline with forwarding and hazard detection
 - [x] UART bootloader for runtime program loading
 - [x] FPGA deployment on Arty A7 at 50 MHz
-- [ ] MAC (multiply-accumulate) instruction extensions for DSP
-- [ ] DSP application demo
+- [x] MAC (multiply-accumulate) instruction extensions for DSP
+- [x] DSP application demo
 
 ## Attributions
 This starter package was developed specifically for this RV32I project and is not a verbatim copy of any external repository.
